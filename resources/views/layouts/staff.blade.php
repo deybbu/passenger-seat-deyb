@@ -11,8 +11,8 @@
         $links = [
             ['Orders', 'staff.orders.index', 'staff/orders', $user->hasRole('kitchen', 'cashier')],
             ['Walk-in order', 'staff.orders.create', 'staff/orders/new', $user->hasRole('kitchen', 'cashier')],
-            ['POS', 'pos.index', 'pos', $user->hasRole('cashier')],
-            ['Ledger', 'pos.transactions', 'pos/transactions', $user->hasRole('cashier')],
+            ['POS', 'staff.pos.index', 'staff/pos', $user->hasRole('cashier')],
+            ['Ledger', 'staff.pos.ledger', 'staff/pos/transactions', $user->hasRole('cashier')],
             ['Inventory', 'inventory.index', 'inventory', $user->hasRole('inventory')],
             ['Stock log', 'inventory.logs', 'inventory/logs', $user->hasRole('inventory')],
             ['Menu', 'admin.menu.index', 'admin/menu', $user->role === 'admin'],
@@ -45,7 +45,7 @@
 
             <div class="flex items-center gap-3 text-sm">
                 <span class="text-gray-600">{{ $user->name }} <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold capitalize">{{ $user->role }}</span></span>
-                <form method="POST" action="{{ route('logout') }}">
+                <form method="POST" action="{{ route('staff.logout') }}">
                     @csrf
                     <button type="submit" class="rounded-full border border-gray-300 px-3 py-1.5 font-semibold hover:bg-gray-50">Sign out</button>
                 </form>

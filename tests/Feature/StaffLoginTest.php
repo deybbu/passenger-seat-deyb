@@ -1,0 +1,41 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Tests\TestCase;
+
+class StaffLoginTest extends TestCase
+{
+    public function test_staff_login_is_available_at_its_separate_route(): void
+    {
+        $this->get('/staff/login')->assertOk();
+    }
+
+    public function test_customers_cannot_access_staff_or_admin_pages(): void
+    {
+        $customer = new User(['name' => 'Customer', 'email' => 'customer@example.com', 'role' => 'customer']);
+
+        $this->actingAs($customer)
+            ->get('/staff/orders')
+            ->assertForbidden();
+
+        $this->get('/admin/menu')->assertForbidden();
+    }
+
+    public function test_staff_login_attempts_are_rate_limited(): void
+    {
+        Auth::shouldReceive('userResolver')->andReturn(fn () => null);
+        Auth::shouldReceive('attempt')->times(5)->andReturn(false);
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->from('/staff/login')
+                ->post('/staff/login', ['email' => 'staff@example.com', 'password' => 'wrong'])
+                ->assertRedirect('/staff/login');
+        }
+
+        $this->post('/staff/login', ['email' => 'staff@example.com', 'password' => 'wrong'])
+            ->assertStatus(429);
+    }
+}

@@ -39,10 +39,10 @@ class LoginController extends Controller
 
         $user = $request->user();
 
-        if (! in_array($user->role, User::ROLES, true)) {
+        if ($user === null || ! in_array($user->role, User::ROLES, true)) {
             $this->endSession($request);
 
-            return redirect()->route('login')->withErrors(['email' => 'This account has no staff role yet. Ask an admin.']);
+            return redirect()->route('staff.login')->withErrors(['email' => 'This account has no staff role yet. Ask an admin.']);
         }
 
         return redirect()->intended($user->homeUrl());
@@ -52,7 +52,7 @@ class LoginController extends Controller
     {
         $this->endSession($request);
 
-        return redirect()->route('login');
+        return redirect()->route('staff.login');
     }
 
     private function endSession(Request $request): void

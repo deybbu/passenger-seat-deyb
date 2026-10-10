@@ -25,6 +25,23 @@ class InventoryController extends Controller
         return view('inventory.index', compact('ingredients', 'lowStockCount'));
     }
 
+    public function logs(Request $request): View
+    {
+        $validated = $request->validate([
+            'ingredient' => ['nullable', 'integer', 'exists:ingredients,id'],
+        ]);
+
+        $ingredients = Ingredient::query()->orderBy('name')->get();
+        $logs = InventoryLog::query()
+            ->with(['ingredient', 'user'])
+            ->when($validated['ingredient'] ?? null, fn ($query, $ingredientId) => $query->where('ingredient_id', $ingredientId))
+            ->latest()
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('inventory.logs', compact('ingredients', 'logs'));
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([

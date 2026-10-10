@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}">
     <title>@yield('title', 'Passenger Seat Restaurant') | Passenger Seat</title>
     <meta name="description" content="A Filipino-inspired dining experience at Passenger Seat Restaurant.">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -25,7 +26,6 @@
                 <a href="{{ route('home') }}#experience">Experience</a>
                 <a href="{{ route('contact') }}">Contact</a>
                 <a class="button button-small" href="{{ route('home') }}#menu">Explore Menu <span aria-hidden="true">↗</span></a>
-                <a class="admin-link" href="#" aria-label="Admin login will be available in Phase 2">Admin Login</a>
             </div>
         </nav>
     </header>

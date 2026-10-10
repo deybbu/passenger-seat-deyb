@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kitchen Order Board</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}"><title>Kitchen Order Board</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
 <header class="bg-red-800 text-white"><div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-5"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-red-100">Passenger Seat · Staff</p><h1 class="text-2xl font-black">Order board</h1></div><a class="font-bold underline" href="{{ route('menu.index') }}">Public menu</a></div></header>
 <main class="mx-auto max-w-7xl px-4 py-8">
