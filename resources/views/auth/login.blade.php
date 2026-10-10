@@ -194,7 +194,7 @@
             font-weight: 750;
         }
 
-        @media (max-width: 700px) {
+        @media (max-width: 800px) {
             .staff-login-page {
                 padding: 18px 14px;
             }
