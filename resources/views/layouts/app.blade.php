@@ -11,7 +11,7 @@
 </head>
 <body>
     <header class="site-header">
-        <nav class="nav-shell container" aria-label="Main navigation">
+        <nav class="nav-shell site-container" aria-label="Main navigation">
             <a class="brand" href="{{ route('home') }}" aria-label="Passenger Seat home">
                 <span class="brand-mark" aria-hidden="true">PS</span>
                 <span class="brand-copy"><strong>PASSENGER SEAT</strong><small>RESTAURANT</small></span>
@@ -35,7 +35,7 @@
     </main>
 
     <footer class="site-footer">
-        <div class="container footer-grid">
+        <div class="site-container footer-grid">
             <div>
                 <a class="brand brand-footer" href="{{ route('home') }}">
                     <span class="brand-mark" aria-hidden="true">PS</span>
@@ -55,7 +55,7 @@
                 <p class="muted">Please contact the restaurant for current hours and contact details.</p>
             </div>
         </div>
-        <div class="container footer-bottom">
+        <div class="site-container footer-bottom">
             <span>© {{ date('Y') }} Passenger Seat Restaurant</span>
             <span>Made for a memorable journey.</span>
         </div>

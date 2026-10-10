@@ -9,7 +9,7 @@
 <section class="hero" id="home">
     <div class="hero-glow"></div>
 
-    <div class="container hero-grid">
+    <div class="site-container hero-grid">
         <div class="hero-copy">
             <div class="eyebrow">
                 <span class="eyebrow-line"></span>
@@ -111,7 +111,7 @@
 
 {{-- INTRODUCTION STRIP --}}
 <section class="intro-strip">
-    <div class="container intro-strip-inner">
+    <div class="site-container intro-strip-inner">
         <span>THE DESTINATION</span>
 
         <p>
@@ -125,7 +125,7 @@
 
 {{-- MENU SECTION --}}
 <section class="section menu-section" id="menu">
-    <div class="container">
+    <div class="site-container">
 
         <div class="section-heading">
             <div>
@@ -244,7 +244,7 @@
 
 {{-- EXPERIENCE SECTION --}}
 <section class="experience-section" id="experience">
-    <div class="container experience-grid">
+    <div class="site-container experience-grid">
 
         <div class="experience-visual">
             <img
@@ -322,7 +322,7 @@
 
 {{-- LOCATION SECTION --}}
 <section class="location-section">
-    <div class="container location-card">
+    <div class="site-container location-card">
 
         <div class="location-copy">
 
