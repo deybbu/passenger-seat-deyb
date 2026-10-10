@@ -1,0 +1,50 @@
+@extends('layouts.admin')
+
+@section('title', 'Food waste monitoring')
+@section('page-title', 'Food waste monitoring')
+
+@section('content')
+    <div class="admin-card" style="margin-bottom:16px;">
+        <div class="admin-card-header"><span class="admin-card-title">Log food waste</span></div>
+        <form method="POST" action="{{ route('admin.waste.store') }}" class="admin-form-grid">
+            @csrf
+            <label class="admin-field">Ingredient
+                <select name="ingredient_id" required>
+                    <option value="">Choose an ingredient</option>
+                    @foreach($ingredients as $ingredient)
+                        <option value="{{ $ingredient->id }}">{{ $ingredient->name }} ({{ $ingredient->unit }})</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="admin-field">Quantity wasted
+                <input type="number" name="quantity" min="0.001" step="0.001" required>
+            </label>
+            <label class="admin-field">Notes
+                <input type="text" name="notes" maxlength="200" placeholder="Reason or details">
+            </label>
+            <div><button type="submit" class="btn-red">Record waste</button></div>
+        </form>
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-header"><span class="admin-card-title">Recent waste records</span></div>
+        <div class="admin-table-wrap">
+            <table class="admin-data-table">
+                <thead><tr><th>Ingredient</th><th>Quantity</th><th>Recorded by</th><th>Notes</th><th>Date</th></tr></thead>
+                <tbody>
+                    @forelse($logs as $log)
+                        <tr>
+                            <td class="admin-strong">{{ $log->ingredient->name ?? 'Deleted ingredient' }}</td>
+                            <td>{{ number_format(abs((float) $log->quantity), 3) }} {{ $log->ingredient->unit ?? '' }}</td>
+                            <td>{{ $log->user->name ?? 'System' }}</td>
+                            <td>{{ $log->notes ?? '—' }}</td>
+                            <td>{{ $log->created_at->format('M j, Y g:i A') }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="admin-muted">No waste has been recorded yet.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+@endsection

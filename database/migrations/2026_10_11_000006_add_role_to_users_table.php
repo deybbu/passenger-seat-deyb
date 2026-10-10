@@ -10,16 +10,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            // admin | cashier | kitchen | inventory. Null = no access.
-            $table->string('role')->nullable()->after('password');
-        });
+        if (! Schema::hasColumn('users', 'role')) {
+            Schema::table('users', function (Blueprint $table): void {
+                $table->string('role')->nullable()->after('password');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('role');
-        });
+        // Existing role assignments may predate this migration; preserve them on rollback.
     }
 };

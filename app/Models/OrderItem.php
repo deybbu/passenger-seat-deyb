@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderItem extends Model
 {
-    protected $fillable = ['order_id', 'menu_item_id', 'item_name', 'quantity', 'price'];
+    protected $fillable = ['order_id', 'menu_item_id', 'item_name', 'name', 'quantity', 'price', 'line_total'];
 
     protected function casts(): array
     {
@@ -24,5 +24,10 @@ class OrderItem extends Model
     public function menuItem(): BelongsTo
     {
         return $this->belongsTo(MenuItem::class);
+    }
+
+    public function getItemNameAttribute(): string
+    {
+        return $this->attributes['item_name'] ?? $this->attributes['name'] ?? '';
     }
 }

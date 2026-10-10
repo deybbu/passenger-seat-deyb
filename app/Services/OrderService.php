@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Single place where orders are created and moved between statuses.
@@ -34,7 +35,7 @@ final class OrderService
         return DB::transaction(function () use ($data, $lines, $staff) {
             $this->inventory->assertAvailable($lines);
 
-            $order = Order::create([
+            $orderAttributes = [
                 'reference_number' => $this->nextReference(),
                 'type' => $data['type'],
                 'table_number' => $data['type'] === 'dine_in' ? $data['table_number'] : null,
@@ -44,15 +45,36 @@ final class OrderService
                 'total_amount' => round((float) $lines->sum('line_total'), 2),
                 'status' => 'pending',
                 'payment_status' => 'unpaid',
-            ]);
+            ];
+
+            if ($staff !== null && Schema::hasColumn('orders', 'cashier_id')) {
+                $orderAttributes['cashier_id'] = $staff->id;
+            }
+            if (Schema::hasColumn('orders', 'order_type')) {
+                $orderAttributes['order_type'] = $data['type'];
+            }
+            if (Schema::hasColumn('orders', 'subtotal')) {
+                $orderAttributes['subtotal'] = round((float) $lines->sum('line_total'), 2);
+            }
+            if (Schema::hasColumn('orders', 'total')) {
+                $orderAttributes['total'] = round((float) $lines->sum('line_total'), 2);
+            }
+
+            $order = Order::create($orderAttributes);
 
             foreach ($lines as $line) {
-                $order->items()->create([
+                $itemAttributes = [
                     'menu_item_id' => $line->item->id,
                     'name' => $line->item->name,
                     'quantity' => $line->qty,
                     'price' => $line->item->price,
-                ]);
+                ];
+
+                if (Schema::hasColumn('order_items', 'line_total')) {
+                    $itemAttributes['line_total'] = round((float) $line->line_total, 2);
+                }
+
+                $order->items()->create($itemAttributes);
             }
 
             $this->inventory->deductForOrder($order, $lines, $staff);

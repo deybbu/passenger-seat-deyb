@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ingredient extends Model
@@ -23,6 +24,12 @@ class Ingredient extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(InventoryLog::class);
+    }
+
+    public function menuItems(): BelongsToMany
+    {
+        return $this->belongsToMany(MenuItem::class, 'ingredient_menu_item', 'ingredient_id', 'menu_item_id')
+            ->withPivot('quantity');
     }
 
     public function isLowStock(): bool

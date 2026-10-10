@@ -26,7 +26,7 @@ class User extends Authenticatable
 
     public function ordersCreated(): HasMany
     {
-        return $this->hasMany(Order::class, 'created_by');
+        return $this->hasMany(Order::class, 'cashier_id');
     }
 
     public function inventoryLogs(): HasMany
@@ -42,7 +42,7 @@ class User extends Authenticatable
     public function homeUrl(): string
     {
         return match ($this->role) {
-            'admin' => route('admin.menu.index'),
+            'admin' => route('admin.dashboard'),
             'kitchen' => route('staff.orders.index'),
             'cashier' => route('staff.pos.index'),
             'inventory' => route('inventory.index'),

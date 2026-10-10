@@ -7,7 +7,7 @@
 <body class="min-h-screen bg-gray-100 font-sans text-gray-900 antialiased">
     @php
         $user = auth()->user();
-        $lowStockCount = $user->hasRole('inventory') ? \App\Models\Ingredient::lowStock()->count() : 0;
+        $lowStockCount = $user->hasRole('inventory') ? \App\Models\Ingredient::where('manual_override', false)->whereColumn('current_stock', '<=', 'min_threshold')->count() : 0;
         $links = [
             ['Orders', 'staff.orders.index', 'staff/orders', $user->hasRole('kitchen', 'cashier')],
             ['Walk-in order', 'staff.orders.create', 'staff/orders/new', $user->hasRole('kitchen', 'cashier')],
@@ -15,7 +15,6 @@
             ['Ledger', 'staff.pos.ledger', 'staff/pos/transactions', $user->hasRole('cashier')],
             ['Inventory', 'inventory.index', 'inventory', $user->hasRole('inventory')],
             ['Stock log', 'inventory.logs', 'inventory/logs', $user->hasRole('inventory')],
-            ['Menu', 'admin.menu.index', 'admin/menu', $user->role === 'admin'],
         ];
     @endphp
 

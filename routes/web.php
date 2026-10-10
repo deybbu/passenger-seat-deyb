@@ -1,6 +1,9 @@
 <?php
 
-use App\Http\Controllers\Admin\MenuAvailabilityController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ModuleController;
+use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
@@ -62,6 +65,37 @@ Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
-        Route::get('/menu', [MenuAvailabilityController::class, 'index'])->name('menu.index');
-        Route::patch('/menu/{item}/availability', [MenuAvailabilityController::class, 'toggle'])->name('menu.toggle');
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders');
+        Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.status');
+        Route::get('/pos', [DashboardController::class, 'pos'])->name('pos');
+        Route::get('/menu-management', [DashboardController::class, 'menuManagement'])->name('menu-management');
+        Route::post('/menu-management', [ModuleController::class, 'storeMenuItem'])->name('menu-management.store');
+        Route::patch('/menu-management/{item}', [ModuleController::class, 'toggleMenuItem'])->name('menu-management.toggle');
+        Route::get('/inventory', [DashboardController::class, 'inventory'])->name('inventory');
+        Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
+        Route::post('/inventory/{ingredient}/logs', [InventoryController::class, 'log'])->name('inventory.log');
+        Route::get('/recipes', [ModuleController::class, 'recipes'])->name('recipes');
+        Route::post('/recipes', [ModuleController::class, 'storeRecipe'])->name('recipes.store');
+        Route::get('/barcode', [DashboardController::class, 'barcode'])->name('barcode');
+        Route::post('/barcode', [ModuleController::class, 'receiveBarcode'])->name('barcode.receive');
+        Route::get('/waste', [ModuleController::class, 'waste'])->name('waste');
+        Route::post('/waste', [ModuleController::class, 'storeWaste'])->name('waste.store');
+        Route::get('/analytics', [ModuleController::class, 'analytics'])->name('analytics');
+        Route::get('/forecasting', [ModuleController::class, 'forecasting'])->name('forecasting');
+        Route::get('/reservations', [ModuleController::class, 'reservations'])->name('reservations');
+        Route::post('/reservations', [ModuleController::class, 'storeReservation'])->name('reservations.store');
+        Route::patch('/reservations/{reservation}', [ModuleController::class, 'updateReservation'])->name('reservations.update');
+        Route::get('/chatbot', [ModuleController::class, 'chatbot'])->name('chatbot');
+        Route::post('/chatbot', [ModuleController::class, 'chatbotMessage'])->name('chatbot.message');
+        Route::post('/chatbot/knowledge', [ModuleController::class, 'storeKnowledge'])->name('chatbot.knowledge');
+        Route::get('/users', [ModuleController::class, 'users'])->name('users');
+        Route::post('/users', [ModuleController::class, 'storeUser'])->name('users.store');
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
+        Route::post('/notifications/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+        Route::get('/activity', [ModuleController::class, 'activity'])->name('activity');
+        Route::get('/settings', [ModuleController::class, 'settings'])->name('settings');
+        Route::post('/settings', [ModuleController::class, 'updateSettings'])->name('settings.update');
     });

@@ -21,7 +21,7 @@ class StaffLoginTest extends TestCase
             ->get('/staff/orders')
             ->assertForbidden();
 
-        $this->get('/admin/menu')->assertForbidden();
+        $this->get('/admin/dashboard')->assertForbidden();
     }
 
     public function test_staff_login_attempts_are_rate_limited(): void

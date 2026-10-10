@@ -138,20 +138,24 @@ final class InventoryService
             default => throw new \DomainException('Unknown stock movement type.'),
         };
 
-        $new = round((float) $ingredient->current_stock + $delta, 3);
+        $before = round((float) $ingredient->current_stock, 3);
+        $new = round($before + $delta, 3);
 
         if ($new < -self::EPSILON) {
             throw new \DomainException("Not enough {$ingredient->name} in stock for that movement.");
         }
 
-        $ingredient->update(['current_stock' => max(0.0, $new)]);
+        $after = max(0.0, $new);
+        $ingredient->update(['current_stock' => $after]);
 
         InventoryLog::create([
             'ingredient_id' => $ingredient->id,
             'user_id' => $actor?->id,
             'type' => $type,
             'quantity' => $type === 'adjustment' ? $delta : abs($quantity),
-            'note' => $note !== null ? mb_substr($note, 0, 200) : null,
+            'stock_before' => $before,
+            'stock_after' => $after,
+            'notes' => $note !== null ? mb_substr($note, 0, 500) : null,
         ]);
     }
 }
