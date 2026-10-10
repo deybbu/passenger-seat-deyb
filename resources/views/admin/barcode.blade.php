@@ -14,7 +14,7 @@
             <label class="admin-field">Quantity received
                 <input type="number" name="quantity" min="0.001" step="0.001" required>
             </label>
-            <div><button type="submit" class="btn-red">Receive stock</button></div>
+            <div class="admin-recipe-form-action"><button type="submit" class="btn-red">Receive stock</button></div>
         </form>
         <p class="admin-muted">Use an ingredient code such as ING-0001 or enter its exact name. The stock ledger is updated automatically.</p>
     </div>

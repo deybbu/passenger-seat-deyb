@@ -22,7 +22,7 @@
             <label class="admin-field">Notes
                 <input type="text" name="notes" maxlength="200" placeholder="Reason or details">
             </label>
-            <div><button type="submit" class="btn-red">Record waste</button></div>
+            <div class="admin-recipe-form-action"><button type="submit" class="btn-red">Record waste</button></div>
         </form>
     </div>
 

@@ -8,7 +8,7 @@
         <div class="admin-card-header">
             <span class="admin-card-title">Add recipe ingredient</span>
         </div>
-        <form method="POST" action="{{ route('admin.recipes.store') }}" class="admin-form-grid">
+        <form method="POST" action="{{ route('admin.recipes.store') }}" class="admin-form-grid admin-recipe-form">
             @csrf
             <label class="admin-field">Menu item
                 <select name="menu_item_id" required>
@@ -29,7 +29,7 @@
             <label class="admin-field">Quantity per serving
                 <input type="number" name="quantity" min="0.001" step="0.001" required>
             </label>
-            <div><button type="submit" class="btn-red">Save recipe line</button></div>
+            <div class="admin-recipe-form-action"><button type="submit" class="btn-red">Save recipe line</button></div>
         </form>
     </div>
 

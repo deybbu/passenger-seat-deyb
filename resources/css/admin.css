@@ -999,6 +999,11 @@ html[data-theme="dark"] .theme-icon-sun { display: block; }
     margin-bottom: 16px;
 }
 
+.admin-recipe-form-action {
+    display: flex;
+    align-items: flex-end;
+}
+
 .admin-field {
     display: flex;
     flex-direction: column;

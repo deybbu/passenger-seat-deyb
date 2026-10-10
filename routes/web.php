@@ -5,6 +5,8 @@ use App\Http\Controllers\Admin\ModuleController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CustomerMenuController;
+use App\Http\Controllers\EventInquiryController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OrderController;
@@ -14,7 +16,11 @@ use App\Http\Controllers\Staff\WalkInOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
-Route::view('/our-story', 'landing.story')->name('story');
+Route::get('/menu', [CustomerMenuController::class, 'index'])->name('menu');
+Route::view('/story', 'landing.story')->name('story');
+Route::redirect('/our-story', '/story');
+Route::get('/events', [EventInquiryController::class, 'index'])->name('events');
+Route::post('/events', [EventInquiryController::class, 'store'])->name('events.store');
 Route::view('/contact', 'landing.contact')->name('contact');
 
 Route::get('/staff/login', [LoginController::class, 'show'])->name('staff.login');
