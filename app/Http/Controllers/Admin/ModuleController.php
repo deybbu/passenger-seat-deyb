@@ -339,6 +339,14 @@ class ModuleController extends Controller
         return back()->with('status', $item->name.' is now '.($item->is_available ? 'available' : 'unavailable').'.');
     }
 
+    public function destroyMenuItem(MenuItem $item): RedirectResponse
+    {
+        $name = $item->name;
+        $item->delete();
+
+        return back()->with('status', $name.' was deleted. Previous order records are preserved.');
+    }
+
     public function receiveBarcode(Request $request): RedirectResponse
     {
         $validated = $request->validate([

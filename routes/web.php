@@ -79,6 +79,7 @@ Route::middleware(['auth', 'role:admin'])
         Route::get('/menu-management', [DashboardController::class, 'menuManagement'])->name('menu-management');
         Route::post('/menu-management', [ModuleController::class, 'storeMenuItem'])->name('menu-management.store');
         Route::patch('/menu-management/{item}', [ModuleController::class, 'toggleMenuItem'])->name('menu-management.toggle');
+        Route::delete('/menu-management/{item}', [ModuleController::class, 'destroyMenuItem'])->name('menu-management.destroy');
         Route::get('/inventory', [DashboardController::class, 'inventory'])->name('inventory');
         Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
         Route::post('/inventory/{ingredient}/logs', [InventoryController::class, 'log'])->name('inventory.log');

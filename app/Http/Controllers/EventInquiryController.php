@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EventInquiry;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,7 @@ class EventInquiryController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'event_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
@@ -91,9 +92,28 @@ class EventInquiryController extends Controller
         });
 
         if ($inquiry === null) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'That date is no longer available. Please choose another date.',
+                    'errors' => ['event_date' => ['That date is no longer available. Please choose another date.']],
+                ], 422);
+            }
+
             return back()
                 ->withErrors(['event_date' => 'That date is no longer available. Please choose another date.'])
                 ->withInput();
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'inquiry' => [
+                    'reference' => $inquiry->reference,
+                    'event_date' => $inquiry->event_date->toDateString(),
+                    'event_type' => $inquiry->event_type,
+                    'guest_count' => $inquiry->guest_count,
+                ],
+            ]);
         }
 
         return redirect()

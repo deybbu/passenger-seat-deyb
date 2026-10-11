@@ -15,7 +15,11 @@ class CustomerMenuController extends Controller
     {
         $categories = MenuCategory::query()
             ->where('is_active', true)
-            ->withCount(['items as active_items_count' => fn ($query) => $query->where('is_active', true)])
+            ->withCount([
+                'items as active_items_count' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->where('is_available', true),
+            ])
             ->orderBy('name')
             ->get();
 
@@ -26,6 +30,7 @@ class CustomerMenuController extends Controller
         $menuItems = MenuItem::query()
             ->with('category')
             ->where('is_active', true)
+            ->where('is_available', true)
             ->when($selectedCategory !== '', fn ($query) => $query->whereHas(
                 'category',
                 fn ($categoryQuery) => $categoryQuery->where('slug', $selectedCategory)

@@ -75,6 +75,13 @@
                                             {{ $item->is_available ? 'Mark unavailable' : 'Mark available' }}
                                         </button>
                                     </form>
+                                    <form method="POST" action="{{ route('admin.menu-management.destroy', $item) }}" style="margin-top:6px;" onsubmit="return confirm('Permanently delete this menu item? Previous order records will remain intact.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn-outline" style="padding:5px 10px;font-size:11px;color:#b91c1c;border-color:#fecaca;">
+                                            Delete
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                         @endforeach
