@@ -13,6 +13,13 @@
         </div>
     @endif
 
+    @php
+        $hasIngredientStock = $item->hasSufficientIngredientStock();
+        $availability = ! $item->is_available
+            ? 'Unavailable'
+            : ($hasIngredientStock ? 'Available' : 'Sold out');
+    @endphp
+
     <div class="landing-menu-card-body">
         <div class="landing-menu-card-heading">
             <h2>{{ $item->name }}</h2>
@@ -25,8 +32,8 @@
 
         <div class="landing-menu-card-meta">
             <span class="landing-menu-category">{{ $item->category?->name ?? 'Uncategorized' }}</span>
-            <span class="landing-menu-availability {{ $item->is_available ? '' : 'is-unavailable' }}">
-                {{ $item->is_available ? 'Available' : 'Unavailable' }}
+            <span class="landing-menu-availability {{ $item->is_available && $hasIngredientStock ? '' : 'is-unavailable' }}">
+                {{ $availability }}
             </span>
         </div>
     </div>

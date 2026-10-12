@@ -26,6 +26,11 @@ class Ingredient extends Model
         return $this->hasMany(InventoryLog::class);
     }
 
+    public function orderReservations(): HasMany
+    {
+        return $this->hasMany(OrderIngredientReservation::class);
+    }
+
     public function menuItems(): BelongsToMany
     {
         return $this->belongsToMany(MenuItem::class, 'ingredient_menu_item', 'ingredient_id', 'menu_item_id')

@@ -18,6 +18,7 @@ class LandingController extends Controller
 
         $featuredItems = MenuItem::query()
             ->with('category')
+            ->withStockAvailability()
             ->where('is_active', true)
             ->where('is_available', true)
             ->where('is_featured', true)

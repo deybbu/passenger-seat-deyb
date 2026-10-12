@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class InventoryLog extends Model
 {
     protected $fillable = [
-        'ingredient_id', 'user_id', 'type', 'quantity', 'stock_before', 'stock_after', 'notes',
+        'ingredient_id', 'user_id', 'order_id', 'type', 'quantity', 'stock_before', 'stock_after', 'notes',
     ];
 
     protected function casts(): array
@@ -30,5 +30,10 @@ class InventoryLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 }

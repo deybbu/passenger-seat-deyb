@@ -34,6 +34,21 @@ class User extends Authenticatable
         return $this->hasMany(InventoryLog::class);
     }
 
+    public function tableSessionsOpened(): HasMany
+    {
+        return $this->hasMany(TableSession::class, 'opened_by');
+    }
+
+    public function tableSessionsClosed(): HasMany
+    {
+        return $this->hasMany(TableSession::class, 'closed_by');
+    }
+
+    public function orderStatusChanges(): HasMany
+    {
+        return $this->hasMany(OrderStatusHistory::class, 'changed_by');
+    }
+
     public function hasRole(string ...$roles): bool
     {
         return in_array($this->role, $roles, true);
@@ -43,7 +58,7 @@ class User extends Authenticatable
     {
         return match ($this->role) {
             'admin' => route('admin.dashboard'),
-            'kitchen' => route('staff.orders.index'),
+            'kitchen' => route('staff.kitchen.index'),
             'cashier' => route('staff.pos.index'),
             'inventory' => route('inventory.index'),
             default => throw new \LogicException('User does not have a valid staff role.'),

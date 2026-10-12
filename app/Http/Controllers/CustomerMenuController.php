@@ -29,6 +29,7 @@ class CustomerMenuController extends Controller
 
         $menuItems = MenuItem::query()
             ->with('category')
+            ->withStockAvailability()
             ->where('is_active', true)
             ->where('is_available', true)
             ->when($selectedCategory !== '', fn ($query) => $query->whereHas(

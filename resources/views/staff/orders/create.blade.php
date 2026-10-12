@@ -1,4 +1,4 @@
-@extends('layouts.staff')
+@extends(auth()->user()->hasRole('cashier') ? 'layouts.pos' : 'layouts.staff')
 
 @section('title', 'Walk-in order')
 
@@ -12,6 +12,10 @@
                 $prices[$item->id] = (float) $item->price;
                 $initial[$item->id] = (int) ($oldItems[$item->id] ?? 0);
             }
+        }
+        foreach ($uncategorizedItems as $item) {
+            $prices[$item->id] = (float) $item->price;
+            $initial[$item->id] = (int) ($oldItems[$item->id] ?? 0);
         }
     @endphp
 
@@ -29,31 +33,30 @@
         @csrf
 
         <div class="space-y-6 lg:col-span-2">
+            @if ($categories->isEmpty() && $uncategorizedItems->isEmpty())
+                <p class="pass p-6 text-center text-sm text-gray-500">No active menu items are available to add to an order.</p>
+            @else
             @foreach ($categories as $category)
                 <section>
                     <h2 class="mb-2 border-l-8 border-brand-600 pl-3 font-display text-2xl font-bold uppercase">{{ $category->name }}</h2>
                     <div class="pass divide-y divide-gray-200">
                         @foreach ($category->items as $item)
-                            @php $orderable = $item->isOrderable(); @endphp
-                            <div class="flex items-center justify-between gap-3 px-4 py-3 {{ $orderable ? '' : 'opacity-50' }}">
-                                <div>
-                                    <p class="font-semibold">{{ $item->name }}</p>
-                                    <p class="text-sm text-gray-500">₱{{ number_format((float) $item->price, 2) }}@unless ($orderable) · Sold out @endunless</p>
-                                </div>
-
-                                @if ($orderable)
-                                    <div class="flex items-center gap-2">
-                                        <button type="button" @click="bump({{ $item->id }}, -1)" class="grid h-9 w-9 place-items-center rounded-full border border-gray-300 hover:bg-gray-50" aria-label="Decrease {{ $item->name }}"><x-icon name="minus" class="h-4 w-4" /></button>
-                                        <input type="number" name="items[{{ $item->id }}]" min="0" max="20" x-model.number="qty[{{ $item->id }}]"
-                                               class="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-center" aria-label="Quantity of {{ $item->name }}">
-                                        <button type="button" @click="bump({{ $item->id }}, 1)" class="grid h-9 w-9 place-items-center rounded-full border border-gray-300 hover:bg-gray-50" aria-label="Increase {{ $item->name }}"><x-icon name="plus" class="h-4 w-4" /></button>
-                                    </div>
-                                @endif
-                            </div>
+                            @include('staff.orders._menu-item', ['item' => $item])
                         @endforeach
                     </div>
                 </section>
             @endforeach
+            @if ($uncategorizedItems->isNotEmpty())
+                <section>
+                    <h2 class="mb-2 border-l-8 border-brand-600 pl-3 font-display text-2xl font-bold uppercase">Uncategorized</h2>
+                    <div class="pass divide-y divide-gray-200">
+                        @foreach ($uncategorizedItems as $item)
+                            @include('staff.orders._menu-item', ['item' => $item])
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @endif
         </div>
 
         <aside class="lg:col-span-1">

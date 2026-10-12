@@ -1,5 +1,94 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}"><title>Transaction Ledger</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
-<body class="min-h-screen bg-slate-100"><header class="bg-red-800 text-white"><div class="mx-auto max-w-7xl px-4 py-5"><h1 class="text-2xl font-black">Transaction ledger</h1><a class="text-sm underline" href="{{ route('staff.pos.index') }}">Back to POS</a></div></header><main class="mx-auto max-w-7xl px-4 py-8">
-<form method="GET" class="mb-6 grid gap-3 rounded-2xl bg-white p-5 sm:grid-cols-2 lg:grid-cols-5"><div><label class="text-sm font-bold" for="from">From</label><input id="from" name="from" type="date" value="{{ request('from') }}" class="mt-1 w-full rounded-lg border-slate-300"></div><div><label class="text-sm font-bold" for="to">To</label><input id="to" name="to" type="date" value="{{ request('to') }}" class="mt-1 w-full rounded-lg border-slate-300"></div><div><label class="text-sm font-bold" for="status">Order status</label><select id="status" name="status" class="mt-1 w-full rounded-lg border-slate-300"><option value="">All</option>@foreach (['pending','preparing','completed','cancelled'] as $status)<option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div><div><label class="text-sm font-bold" for="q">Reference</label><input id="q" name="q" value="{{ request('q') }}" class="mt-1 w-full rounded-lg border-slate-300" maxlength="80"></div><div class="flex items-end"><button class="w-full rounded-lg bg-red-700 px-4 py-2.5 font-bold text-white">Filter</button></div></form>
-<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table class="min-w-full divide-y divide-slate-200 text-left text-sm"><thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500"><tr><th class="px-4 py-3">Reference</th><th class="px-4 py-3">Created</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Payment</th><th class="px-4 py-3 text-right">Total</th><th class="px-4 py-3">Receipt</th></tr></thead><tbody class="divide-y divide-slate-100">@forelse ($orders as $order)<tr><td class="px-4 py-3 font-bold">{{ $order->reference_number }}</td><td class="px-4 py-3">{{ $order->created_at->format('Y-m-d H:i') }}</td><td class="px-4 py-3">{{ $order->type }}</td><td class="px-4 py-3">{{ ucfirst($order->status) }}</td><td class="px-4 py-3">{{ ucfirst($order->payment_status) }}{{ $order->payment_method ? ' · ' . strtoupper($order->payment_method) : '' }}</td><td class="px-4 py-3 text-right font-bold">₱{{ number_format((float) $order->total_amount, 2) }}</td><td class="px-4 py-3"><a class="font-bold text-red-700 underline" href="{{ route('staff.pos.receipt', $order) }}">Receipt</a></td></tr>@empty<tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">No transactions match your filters.</td></tr>@endforelse</tbody></table></div><div class="mt-5">{{ $orders->withQueryString()->links() }}</div></main></body></html>
+@extends('layouts.pos')
+
+@section('title', 'Transactions')
+
+@section('content')
+    <div class="pos-page-heading">
+        <div>
+            <p class="pos-eyebrow">Cashier · Order records</p>
+            <h1>Transaction ledger</h1>
+            <p>Payments and order status remain attached to the same order record.</p>
+        </div>
+    </div>
+
+    <form method="GET" class="pos-filter-form">
+        <div>
+            <label for="from">From</label>
+            <input id="from" name="from" type="date" value="{{ request('from') }}">
+        </div>
+        <div>
+            <label for="to">To</label>
+            <input id="to" name="to" type="date" value="{{ request('to') }}">
+        </div>
+        <div>
+            <label for="status">Order status</label>
+            <select id="status" name="status">
+                <option value="">All</option>
+                @foreach (['pending', 'preparing', 'ready', 'completed', 'cancelled'] as $status)
+                    <option value="{{ $status }}" @selected(request('status') === $status)>{{ str($status)->headline() }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label for="q">Order reference</label>
+            <input id="q" name="q" value="{{ request('q') }}" maxlength="80">
+        </div>
+        <button type="submit" class="pos-button pos-button-primary">Apply filters</button>
+    </form>
+
+    <div class="pos-table-wrap">
+        <table class="pos-table">
+            <thead>
+                <tr>
+                    <th>Reference</th>
+                    <th>Created</th>
+                    <th>Service</th>
+                    <th>Order status</th>
+                    <th>Payment</th>
+                    <th class="is-numeric">Subtotal</th>
+                    <th class="is-numeric">VAT exempt</th>
+                    <th class="is-numeric">Discount</th>
+                    <th class="is-numeric">Total</th>
+                    <th>Receipt</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($orders as $order)
+                    @php
+                        $subtotal = (float) ($order->subtotal ?? $order->items->sum(fn ($item) => (float) $item->price * (int) $item->quantity));
+                        $serviceType = $order->type === 'dine_in'
+                            ? 'Dine-in'.($order->table_number ? ' · Table '.$order->table_number : '')
+                            : 'Take-out';
+                        $vatExclusive = in_array($order->discount_type, ['SC', 'PWD'], true)
+                            ? round($subtotal / 1.12, 2)
+                            : $subtotal;
+                        $vatExemption = in_array($order->discount_type, ['SC', 'PWD'], true)
+                            ? round($subtotal - $vatExclusive, 2)
+                            : 0;
+                    @endphp
+                    <tr>
+                        <td><strong>{{ $order->reference_number }}</strong></td>
+                        <td>{{ $order->created_at->format('Y-m-d H:i') }}</td>
+                        <td>{{ $serviceType }}</td>
+                        <td><span class="pos-badge">{{ str($order->status)->headline() }}</span></td>
+                        <td>
+                            <span class="pos-badge {{ $order->isPaid() ? 'is-paid' : 'is-unpaid' }}">{{ str($order->payment_status)->headline() }}</span>
+                            @if ($order->payment_method)
+                                <small class="pos-table-subtext">{{ strtoupper($order->payment_method) }}</small>
+                            @endif
+                        </td>
+                        <td class="is-numeric">₱{{ number_format($subtotal, 2) }}</td>
+                        <td class="is-numeric">₱{{ number_format($vatExemption, 2) }}</td>
+                        <td class="is-numeric">₱{{ number_format((float) $order->discount_amount, 2) }}</td>
+                        <td class="is-numeric"><strong>₱{{ number_format((float) $order->total_amount, 2) }}</strong></td>
+                        <td><a class="pos-text-link" href="{{ route('staff.pos.receipt', $order) }}">View</a></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="10" class="pos-table-empty">No order records match these filters.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pos-pagination">{{ $orders->withQueryString()->links() }}</div>
+@endsection

@@ -6,17 +6,28 @@ use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CustomerMenuController;
+use App\Http\Controllers\CustomerQrOrderController;
 use App\Http\Controllers\EventInquiryController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
-use App\Http\Controllers\OrderController;
 use App\Http\Controllers\POSController;
+use App\Http\Controllers\Staff\KitchenController;
 use App\Http\Controllers\Staff\OrderBoardController;
+use App\Http\Controllers\Staff\TableSessionController;
 use App\Http\Controllers\Staff\WalkInOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/menu', [CustomerMenuController::class, 'index'])->name('menu');
+Route::get('/order', [CustomerQrOrderController::class, 'show'])->name('customer.qr.show');
+Route::post('/order', [CustomerQrOrderController::class, 'place'])
+    ->middleware('throttle:20,1')
+    ->name('customer.qr.place');
+Route::get('/order/table/{tableSession:public_token}/orders', [CustomerQrOrderController::class, 'orders'])
+    ->name('customer.qr.orders');
+Route::post('/order/table/{tableSession:public_token}/bill', [CustomerQrOrderController::class, 'requestBill'])
+    ->middleware('throttle:5,1')
+    ->name('customer.qr.bill');
 Route::view('/story', 'landing.story')->name('story');
 Route::redirect('/our-story', '/story');
 Route::get('/events', [EventInquiryController::class, 'index'])->name('events');
@@ -39,11 +50,24 @@ Route::middleware(['auth', 'role:kitchen,cashier'])
         Route::get('/orders/new', [WalkInOrderController::class, 'create'])->name('orders.create');
         Route::post('/orders/new', [WalkInOrderController::class, 'store'])->name('orders.store');
         Route::patch('/orders/{order}/transition', [OrderBoardController::class, 'transition'])
-            ->middleware('role:kitchen')
+            ->middleware('role:kitchen,cashier')
             ->name('orders.transition');
-        Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])
-            ->middleware('role:kitchen')
+        Route::patch('/orders/{order}/status', [OrderBoardController::class, 'transition'])
+            ->middleware('role:kitchen,cashier')
             ->name('orders.status');
+        Route::patch('/orders/{order}/complete', [OrderBoardController::class, 'complete'])
+            ->middleware('role:cashier')
+            ->name('orders.complete');
+    });
+
+Route::middleware(['auth', 'role:kitchen'])
+    ->prefix('staff/kitchen')
+    ->name('staff.kitchen.')
+    ->controller(KitchenController::class)
+    ->group(function (): void {
+        Route::get('/', 'index')->name('index');
+        Route::get('/board', 'board')->name('board');
+        Route::get('/inventory', 'inventory')->name('inventory');
     });
 
 Route::middleware(['auth', 'role:cashier'])
@@ -51,9 +75,23 @@ Route::middleware(['auth', 'role:cashier'])
     ->name('staff.pos.')
     ->group(function (): void {
         Route::get('/', [POSController::class, 'index'])->name('index');
+        Route::get('/orders', [POSController::class, 'orders'])->name('orders');
+        Route::get('/analytics', [POSController::class, 'analytics'])->name('analytics');
         Route::get('/transactions', [POSController::class, 'ledger'])->name('ledger');
+        Route::get('/table-qr', [TableSessionController::class, 'posQr'])->name('table-qr');
         Route::get('/orders/{order}/receipt', [POSController::class, 'receipt'])->name('receipt');
         Route::post('/orders/{order}/paid', [POSController::class, 'markPaid'])->name('paid');
+    });
+
+Route::middleware(['auth', 'role:cashier'])
+    ->prefix('staff/tables')
+    ->name('staff.tables.')
+    ->group(function (): void {
+        Route::get('/', [TableSessionController::class, 'index'])->name('index');
+        Route::post('/open', [TableSessionController::class, 'open'])->name('open');
+        Route::patch('/{tableSession}/extend', [TableSessionController::class, 'extend'])->name('extend');
+        Route::patch('/{tableSession}/bill', [TableSessionController::class, 'requestBill'])->name('bill');
+        Route::patch('/{tableSession}/close', [TableSessionController::class, 'close'])->name('close');
     });
 
 Route::middleware(['auth', 'role:inventory'])

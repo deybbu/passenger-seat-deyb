@@ -13,6 +13,7 @@
             ['Walk-in order', 'staff.orders.create', 'staff/orders/new', $user->hasRole('kitchen', 'cashier')],
             ['POS', 'staff.pos.index', 'staff/pos', $user->hasRole('cashier')],
             ['Ledger', 'staff.pos.ledger', 'staff/pos/transactions', $user->hasRole('cashier')],
+            ['Tables', 'staff.tables.index', 'staff/tables', $user->hasRole('cashier')],
             ['Inventory', 'inventory.index', 'inventory', $user->hasRole('inventory')],
             ['Stock log', 'inventory.logs', 'inventory/logs', $user->hasRole('inventory')],
         ];

@@ -19,6 +19,7 @@ class OrderBoardController extends Controller
         $data = [
             'pending' => Order::with('items')->where('status', 'pending')->oldest()->get(),
             'preparing' => Order::with('items')->where('status', 'preparing')->oldest()->get(),
+            'ready' => Order::with('items')->where('status', 'ready')->oldest()->get(),
             'completed' => Order::with('items')->where('status', 'completed')
                 ->whereDate('updated_at', today())->latest('updated_at')->limit(15)->get(),
         ];
@@ -31,12 +32,14 @@ class OrderBoardController extends Controller
 
     public function transition(Request $request, Order $order, OrderService $orders): RedirectResponse
     {
-        // Cashiers can watch the board; only kitchen (and admin) can move orders.
-        abort_unless($request->user()->hasRole('kitchen'), 403);
-
         $data = $request->validate([
-            'status' => ['required', Rule::in(['preparing', 'completed', 'cancelled'])],
+            'status' => ['required', Rule::in(['preparing', 'ready', 'cancelled'])],
         ]);
+        abort_unless(
+            $request->user()->hasRole('kitchen')
+                || ($data['status'] === 'cancelled' && $request->user()->hasRole('cashier')),
+            403,
+        );
 
         try {
             $orders->transition($order, $data['status'], $request->user());
@@ -45,5 +48,18 @@ class OrderBoardController extends Controller
         }
 
         return back()->with('status', "{$order->reference_number} is now {$data['status']}.");
+    }
+
+    public function complete(Request $request, Order $order, OrderService $orders): RedirectResponse
+    {
+        abort_unless($request->user()->hasRole('cashier'), 403);
+
+        try {
+            $orders->transition($order, 'completed', $request->user());
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', "{$order->reference_number} is completed.");
     }
 }

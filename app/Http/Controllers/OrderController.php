@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Services\OrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -112,19 +113,14 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['preparing', 'completed', 'cancelled'])],
+            'status' => ['required', Rule::in(['preparing', 'ready', 'cancelled'])],
         ]);
 
-        $allowed = [
-            'pending' => ['preparing', 'cancelled'],
-            'preparing' => ['completed', 'cancelled'],
-            'completed' => [],
-            'cancelled' => [],
-        ];
-
-        abort_unless(in_array($validated['status'], $allowed[$order->status] ?? [], true), 422, 'Invalid order status transition.');
-
-        $order->update(['status' => $validated['status']]);
+        try {
+            app(OrderService::class)->transition($order, $validated['status'], $request->user());
+        } catch (\DomainException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return back()->with('success', 'Order status updated.');
     }

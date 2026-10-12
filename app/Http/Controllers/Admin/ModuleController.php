@@ -12,6 +12,7 @@ use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\InventoryService;
 use App\Support\AdminSettings;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -61,7 +62,7 @@ class ModuleController extends Controller
         return view('admin.waste', compact('ingredients', 'logs'));
     }
 
-    public function storeWaste(Request $request): RedirectResponse
+    public function storeWaste(Request $request, InventoryService $inventory): RedirectResponse
     {
         $validated = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
@@ -69,22 +70,17 @@ class ModuleController extends Controller
             'notes' => ['nullable', 'string', 'max:200'],
         ]);
 
-        DB::transaction(function () use ($validated, $request): void {
-            $ingredient = Ingredient::query()->lockForUpdate()->findOrFail($validated['ingredient_id']);
-            $before = (float) $ingredient->current_stock;
-            $qty = (float) $validated['quantity'];
-            $after = max(0, $before - $qty);
-
-            $ingredient->update(['current_stock' => $after]);
-            $ingredient->logs()->create([
-                'user_id' => $request->user()->id,
-                'type' => 'waste',
-                'quantity' => -$qty,
-                'stock_before' => $before,
-                'stock_after' => $after,
-                'notes' => $validated['notes'] ?? 'Food waste',
-            ]);
-        });
+        try {
+            $inventory->logMovement(
+                Ingredient::findOrFail($validated['ingredient_id']),
+                'waste',
+                (float) $validated['quantity'],
+                $request->user(),
+                $validated['notes'] ?? 'Food waste',
+            );
+        } catch (\DomainException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return back()->with('status', 'Waste logged and stock updated.');
     }
@@ -347,7 +343,7 @@ class ModuleController extends Controller
         return back()->with('status', $name.' was deleted. Previous order records are preserved.');
     }
 
-    public function receiveBarcode(Request $request): RedirectResponse
+    public function receiveBarcode(Request $request, InventoryService $inventory): RedirectResponse
     {
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:40'],
@@ -369,21 +365,13 @@ class ModuleController extends Controller
             return back()->with('error', 'No ingredient matched that barcode or name.');
         }
 
-        DB::transaction(function () use ($ingredient, $validated, $request): void {
-            $locked = Ingredient::query()->lockForUpdate()->findOrFail($ingredient->id);
-            $before = (float) $locked->current_stock;
-            $qty = (float) $validated['quantity'];
-            $after = $before + $qty;
-            $locked->update(['current_stock' => $after]);
-            $locked->logs()->create([
-                'user_id' => $request->user()->id,
-                'type' => 'stock_in',
-                'quantity' => $qty,
-                'stock_before' => $before,
-                'stock_after' => $after,
-                'notes' => 'Barcode receiving',
-            ]);
-        });
+        $inventory->logMovement(
+            $ingredient,
+            'stock_in',
+            (float) $validated['quantity'],
+            $request->user(),
+            'Barcode receiving',
+        );
 
         return back()->with('status', "Received {$validated['quantity']} {$ingredient->unit} of {$ingredient->name}.");
     }

@@ -1,5 +1,49 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}"><title>Cashier POS</title>@vite(['resources/css/app.css','resources/js/app.js'])</head>
-<body class="min-h-screen bg-slate-100"><header class="bg-red-800 text-white"><div class="mx-auto max-w-7xl px-4 py-5"><p class="text-xs font-bold uppercase tracking-widest text-red-100">Passenger Seat · Cashier</p><h1 class="text-2xl font-black">POS terminal</h1><a class="mt-2 inline-block text-sm underline" href="{{ route('staff.pos.ledger') }}">Transaction ledger</a></div></header>
-<main class="mx-auto max-w-7xl px-4 py-8">@if (session('success'))<div class="mb-5 rounded-xl bg-emerald-50 p-3 font-semibold text-emerald-800">{{ session('success') }}</div>@endif
-<div class="space-y-4">@forelse ($orders as $order)<article class="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-[1fr_auto]"><div><div class="flex flex-wrap items-center gap-3"><h2 class="text-xl font-black">{{ $order->reference_number }}</h2><span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">Unpaid</span></div><p class="mt-1 text-sm text-slate-500">{{ $order->created_at->format('M d, Y · h:i A') }} · {{ $order->type === 'dine_in' ? 'Table ' . $order->table_number : 'Take-out' }}</p><ul class="mt-3 space-y-1 text-sm">@foreach ($order->items as $item)<li>{{ $item->quantity }} × {{ $item->item_name }} — ₱{{ number_format((float) $item->price * $item->quantity, 2) }}</li>@endforeach</ul></div><div class="flex flex-col items-stretch justify-center gap-3 md:min-w-56"><p class="text-2xl font-black text-red-800">₱{{ number_format((float) $order->total_amount, 2) }}</p><form method="POST" action="{{ route('staff.pos.paid', $order) }}" class="space-y-2">@csrf<label for="payment-{{ $order->id }}" class="block text-sm font-bold">Payment method</label><select id="payment-{{ $order->id }}" name="payment_method" class="w-full rounded-lg border-slate-300 text-sm"><option value="cash">Cash</option><option value="card">Card</option><option value="gcash">GCash</option></select><button class="w-full rounded-lg bg-red-700 px-4 py-2.5 font-bold text-white hover:bg-red-800">Confirm payment</button></form><a class="text-center text-sm font-bold text-red-700 underline" href="{{ route('staff.pos.receipt', $order) }}">View receipt</a></div></article>@empty<div class="rounded-2xl bg-white p-12 text-center"><h2 class="text-xl font-black">No unpaid orders</h2></div>@endforelse</div><div class="mt-6">{{ $orders->links() }}</div></main></body></html>
+@extends('layouts.pos-register')
+
+@section('title', 'Passenger Seat POS · Billing')
+@section('pos-tab', 'billing')
+
+@section('content')
+    <h2>Unpaid bills</h2>
+    <p class="mute">Payments are recorded against each existing order. Payment does not change its kitchen status.</p>
+
+    @if ($orders->isEmpty())
+        <div class="card">
+            <p class="mute">No unpaid bills. Table orders appear here automatically.</p>
+        </div>
+    @else
+        <div class="cols">
+            @foreach ($orders as $order)
+                <article class="card">
+                    <h2>
+                        {{ $order->type === 'dine_in' && $order->table_number
+                            ? 'Table '.$order->table_number
+                            : 'Order #'.$order->reference_number }}
+                    </h2>
+                    <div class="mute">
+                        #{{ $order->reference_number }} · {{ str($order->status)->headline() }}
+                    </div>
+                    <div style="margin:6px 0">
+                        @foreach ($order->items as $item)
+                            <div>{{ $item->quantity }}× {{ $item->item_name }}</div>
+                        @endforeach
+                    </div>
+                    <div class="tot">
+                        <div class="g">
+                            <span>Subtotal</span>
+                            <span>₱{{ number_format((float) $order->items->sum(fn ($item) => (float) $item->price * (int) $item->quantity), 2) }}</span>
+                        </div>
+                    </div>
+                    <x-pos-payment-form :order="$order" />
+                    <p><a class="mute" href="{{ route('staff.pos.receipt', $order) }}">View order slip</a></p>
+                </article>
+            @endforeach
+        </div>
+    @endif
+
+    <div>{{ $orders->links() }}</div>
+@endsection
+
+@push('scripts')
+    @vite('resources/js/pos.js')
+@endpush

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Ingredient;
 use App\Models\InventoryLog;
+use App\Services\InventoryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -95,7 +96,7 @@ class InventoryController extends Controller
         return back()->with('success', 'Ingredient deleted.');
     }
 
-    public function log(Request $request, Ingredient $ingredient): RedirectResponse
+    public function log(Request $request, Ingredient $ingredient, InventoryService $inventory): RedirectResponse
     {
         $validated = $request->validate([
             'type' => ['required', Rule::in(['stock_in', 'stock_out', 'adjustment'])],
@@ -103,30 +104,26 @@ class InventoryController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        DB::transaction(function () use ($ingredient, $validated, $request): void {
-            $locked = Ingredient::query()->lockForUpdate()->findOrFail($ingredient->id);
-            $before = (float) $locked->current_stock;
-            $quantity = (float) $validated['quantity'];
-
-            $after = match ($validated['type']) {
-                'stock_in' => $before + $quantity,
-                'stock_out' => $before - $quantity,
-                'adjustment' => $quantity,
-            };
-
-            abort_if($after < 0, 422, 'Stock cannot be reduced below zero.');
-
-            $locked->update(['current_stock' => $after]);
-            InventoryLog::create([
-                'ingredient_id' => $locked->id,
-                'user_id' => $request->user()->id,
-                'type' => $validated['type'],
-                'quantity' => $quantity,
-                'stock_before' => $before,
-                'stock_after' => $after,
-                'notes' => $validated['notes'] ?? null,
-            ]);
-        }, 3);
+        try {
+            if ($validated['type'] === 'adjustment') {
+                $inventory->override(
+                    $ingredient,
+                    (float) $validated['quantity'],
+                    $request->user(),
+                    $validated['notes'] ?? 'Manual stock adjustment',
+                );
+            } else {
+                $inventory->logMovement(
+                    $ingredient,
+                    $validated['type'],
+                    (float) $validated['quantity'],
+                    $request->user(),
+                    $validated['notes'] ?? null,
+                );
+            }
+        } catch (\DomainException $exception) {
+            return back()->withErrors(['quantity' => $exception->getMessage()]);
+        }
 
         return back()->with('success', 'Stock log recorded.');
     }

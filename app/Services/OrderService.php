@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\OrderStatusHistory;
+use App\Models\MenuItem;
+use App\Models\TableSession;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +24,7 @@ final class OrderService
     }
 
     /**
-     * @param  array{type:string, table_number:?string, customer_name:string, customer_phone:?string, special_instructions:?string}  $data
+     * @param  array{type:string, table_number:?string, customer_name?:?string, customer_phone?:?string, special_instructions:?string, table_session_id?:?int, submission_token?:?string}  $data
      * @param  Collection<int, object{item: \App\Models\MenuItem, qty: int, line_total: float}>  $lines
      *
      * @throws \DomainException when stock or availability fails
@@ -33,20 +36,61 @@ final class OrderService
         }
 
         return DB::transaction(function () use ($data, $lines, $staff) {
-            $this->inventory->assertAvailable($lines);
+            $lockedLines = $lines->sortBy(fn ($line) => $line->item->id)->map(function ($line) {
+                $item = MenuItem::query()
+                    ->with('ingredients')
+                    ->whereKey($line->item->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($item === null || ! $item->isOrderable()) {
+                    throw new \DomainException(($line->item->name ?? 'A selected dish') . ' is no longer available.');
+                }
+
+                $quantity = (int) $line->qty;
+
+                return (object) [
+                    'item' => $item,
+                    'qty' => $quantity,
+                    'line_total' => round((float) $item->price * $quantity, 2),
+                ];
+            })->values();
+
+            if ($lockedLines->isEmpty()) {
+                throw new \DomainException('The order is empty.');
+            }
+
+            if (isset($data['table_session_id'])) {
+                $tableSession = TableSession::query()
+                    ->whereKey($data['table_session_id'])
+                    ->whereNull('closed_at')
+                    ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($tableSession === null || $tableSession->table_number !== (string) $data['table_number']) {
+                    throw new \DomainException('This table session is no longer open. Please ask staff for help.');
+                }
+            }
 
             $orderAttributes = [
                 'reference_number' => $this->nextReference(),
                 'type' => $data['type'],
                 'table_number' => $data['type'] === 'dine_in' ? $data['table_number'] : null,
-                'customer_name' => $data['customer_name'],
+                'customer_name' => $data['customer_name'] ?? 'Table guest',
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'special_instructions' => $data['special_instructions'] ?? null,
-                'total_amount' => round((float) $lines->sum('line_total'), 2),
+                'total_amount' => round((float) $lockedLines->sum('line_total'), 2),
                 'status' => 'pending',
                 'payment_status' => 'unpaid',
             ];
 
+            if (isset($data['table_session_id']) && Schema::hasColumn('orders', 'table_session_id')) {
+                $orderAttributes['table_session_id'] = $data['table_session_id'];
+            }
+            if (isset($data['submission_token']) && Schema::hasColumn('orders', 'submission_token')) {
+                $orderAttributes['submission_token'] = $data['submission_token'];
+            }
             if ($staff !== null && Schema::hasColumn('orders', 'cashier_id')) {
                 $orderAttributes['cashier_id'] = $staff->id;
             }
@@ -54,15 +98,22 @@ final class OrderService
                 $orderAttributes['order_type'] = $data['type'];
             }
             if (Schema::hasColumn('orders', 'subtotal')) {
-                $orderAttributes['subtotal'] = round((float) $lines->sum('line_total'), 2);
+                $orderAttributes['subtotal'] = round((float) $lockedLines->sum('line_total'), 2);
             }
             if (Schema::hasColumn('orders', 'total')) {
-                $orderAttributes['total'] = round((float) $lines->sum('line_total'), 2);
+                $orderAttributes['total'] = round((float) $lockedLines->sum('line_total'), 2);
             }
 
             $order = Order::create($orderAttributes);
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'from_status' => null,
+                'to_status' => 'pending',
+                'changed_by' => $staff?->id,
+                'note' => 'Order placed',
+            ]);
 
-            foreach ($lines as $line) {
+            foreach ($lockedLines as $line) {
                 $itemAttributes = [
                     'menu_item_id' => $line->item->id,
                     'name' => $line->item->name,
@@ -77,7 +128,7 @@ final class OrderService
                 $order->items()->create($itemAttributes);
             }
 
-            $this->inventory->deductForOrder($order, $lines, $staff);
+            $this->inventory->reserveForOrder($order, $lockedLines);
 
             return $order;
         });
@@ -98,10 +149,21 @@ final class OrderService
                     throw new \DomainException('This order is already paid. Handle the refund first.');
                 }
 
-                $this->inventory->restoreForOrder($locked, $actor);
+                $this->inventory->releaseOrRestoreForCancelledOrder($locked, $actor);
             }
 
+            if ($to === 'preparing') {
+                $this->inventory->consumeReservationsForOrder($locked, $actor);
+            }
+
+            $from = $locked->status;
             $locked->update(['status' => $to]);
+            OrderStatusHistory::create([
+                'order_id' => $locked->id,
+                'from_status' => $from,
+                'to_status' => $to,
+                'changed_by' => $actor->id,
+            ]);
 
             return $locked;
         });

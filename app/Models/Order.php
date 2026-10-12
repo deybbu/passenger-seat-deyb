@@ -11,14 +11,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Order extends Model
 {
     protected $fillable = [
-        'reference_number', 'type', 'table_number', 'customer_name', 'customer_phone', 'special_instructions',
+        'reference_number', 'type', 'table_number', 'table_session_id', 'submission_token',
+        'customer_name', 'customer_phone', 'special_instructions',
         'total_amount', 'status', 'payment_status', 'payment_method', 'cashier_id', 'paid_at',
-        'order_type', 'subtotal', 'total',
+        'payment_reference', 'amount_tendered', 'order_type', 'subtotal', 'total',
+        'discount_type', 'discount_rate', 'discount_amount', 'discount_cardholder_name',
+        'discount_id_number', 'discount_tin',
     ];
 
     protected function casts(): array
     {
-        return ['total_amount' => 'decimal:2', 'paid_at' => 'datetime'];
+        return [
+            'total_amount' => 'decimal:2',
+            'subtotal' => 'decimal:2',
+            'total' => 'decimal:2',
+            'discount_rate' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
+            'amount_tendered' => 'decimal:2',
+            'paid_at' => 'datetime',
+        ];
     }
 
     public function items(): HasMany
@@ -29,6 +40,26 @@ class Order extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(OrderStatusHistory::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    public function ingredientReservations(): HasMany
+    {
+        return $this->hasMany(OrderIngredientReservation::class);
+    }
+
+    public function inventoryLogs(): HasMany
+    {
+        return $this->hasMany(InventoryLog::class);
+    }
+
+    public function tableSession(): BelongsTo
+    {
+        return $this->belongsTo(TableSession::class);
     }
 
     public function getTotalAmountAttribute(): mixed
@@ -50,7 +81,7 @@ class Order extends Model
     {
         $allowed = [
             'pending' => ['preparing', 'cancelled'],
-            'preparing' => ['ready', 'completed', 'cancelled'],
+            'preparing' => ['ready', 'cancelled'],
             'ready' => ['completed', 'cancelled'],
             'completed' => [],
             'cancelled' => [],

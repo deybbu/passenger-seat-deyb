@@ -47,5 +47,26 @@ class AppServiceProvider extends ServiceProvider
                 'adminSettings' => $settings,
             ]);
         });
+
+        View::composer('layouts.pos-register', function ($view): void {
+            $pendingOrderCount = 0;
+            $unpaidOrderCount = 0;
+            $user = auth()->user();
+
+            if ($user?->hasRole('cashier') && Schema::hasTable('orders')) {
+                $pendingOrderCount = Order::query()->where('status', 'pending')->count();
+                $unpaidOrderCount = Order::query()
+                    ->where('payment_status', 'unpaid')
+                    ->whereNot('status', 'cancelled')
+                    ->get(['id', 'type', 'table_number'])
+                    ->map(fn (Order $order): string => $order->type === 'dine_in' && $order->table_number
+                        ? 'table:'.$order->table_number
+                        : 'order:'.$order->id)
+                    ->unique()
+                    ->count();
+            }
+
+            $view->with(compact('pendingOrderCount', 'unpaidOrderCount'));
+        });
     }
 }

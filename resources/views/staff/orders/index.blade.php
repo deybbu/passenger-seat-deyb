@@ -1,4 +1,4 @@
-@extends('layouts.staff')
+@extends(auth()->user()->hasRole('cashier') ? 'layouts.pos' : 'layouts.staff')
 
 @section('title', 'Orders')
 
