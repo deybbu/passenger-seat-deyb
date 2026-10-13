@@ -17,13 +17,16 @@ class InventoryController extends Controller
 {
     public function index(): View
     {
-        $ingredients = Ingredient::query()->with('logs.user')->orderBy('name')->paginate(30);
-        $lowStockCount = Ingredient::query()
-            ->where('manual_override', false)
-            ->whereColumn('current_stock', '<=', 'min_threshold')
-            ->count();
+        $ingredients = Ingredient::query()->orderBy('name')->get();
+        $logs = InventoryLog::query()
+            ->with(['ingredient', 'user'])
+            ->latest()
+            ->limit(100)
+            ->get();
+        $lowStockCount = $ingredients->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock())->count();
+        $outOfStockCount = $ingredients->filter(fn (Ingredient $ingredient): bool => (float) $ingredient->current_stock <= 0)->count();
 
-        return view('inventory.index', compact('ingredients', 'lowStockCount'));
+        return view('inventory.index', compact('ingredients', 'logs', 'lowStockCount', 'outOfStockCount'));
     }
 
     public function logs(Request $request): View
@@ -45,12 +48,15 @@ class InventoryController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge(['barcode' => trim((string) $request->input('barcode', ''))]);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120', 'unique:ingredients,name'],
+            'barcode' => ['nullable', 'string', 'max:64', 'unique:ingredients,barcode'],
             'current_stock' => ['required', 'numeric', 'min:0', 'max:999999999'],
             'unit' => ['required', 'string', 'max:20'],
             'min_threshold' => ['required', 'numeric', 'min:0', 'max:999999999'],
         ]);
+        $validated['barcode'] = $validated['barcode'] !== '' ? $validated['barcode'] : null;
 
         DB::transaction(function () use ($validated, $request): void {
             $ingredient = Ingredient::create($validated);
@@ -69,17 +75,39 @@ class InventoryController extends Controller
         return back()->with('success', 'Ingredient created.');
     }
 
+    public function assignBarcode(Request $request): RedirectResponse
+    {
+        $request->merge(['barcode' => trim((string) $request->input('barcode', ''))]);
+        $validated = $request->validate([
+            'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
+            'barcode' => ['required', 'string', 'max:64', 'unique:ingredients,barcode'],
+        ]);
+
+        $ingredient = Ingredient::query()->findOrFail($validated['ingredient_id']);
+        $ingredient->update(['barcode' => $validated['barcode']]);
+
+        return back()->with('success', "Barcode assigned to {$ingredient->name}.");
+    }
+
     public function update(Request $request, Ingredient $ingredient): RedirectResponse
     {
+        if ($request->has('barcode')) {
+            $request->merge(['barcode' => trim((string) $request->input('barcode'))]);
+        }
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120', Rule::unique('ingredients', 'name')->ignore($ingredient->id)],
+            'barcode' => ['nullable', 'string', 'max:64', Rule::unique('ingredients', 'barcode')->ignore($ingredient->id)],
             'unit' => ['required', 'string', 'max:20'],
             'min_threshold' => ['required', 'numeric', 'min:0', 'max:999999999'],
             'manual_override' => ['sometimes', 'boolean'],
         ]);
 
+        $validatedBarcode = $request->has('barcode')
+            ? ($validated['barcode'] !== '' ? $validated['barcode'] : null)
+            : $ingredient->barcode;
         $ingredient->update([
             'name' => $validated['name'],
+            'barcode' => $validatedBarcode,
             'unit' => $validated['unit'],
             'min_threshold' => $validated['min_threshold'],
             'manual_override' => $request->boolean('manual_override'),
@@ -99,8 +127,13 @@ class InventoryController extends Controller
     public function log(Request $request, Ingredient $ingredient, InventoryService $inventory): RedirectResponse
     {
         $validated = $request->validate([
-            'type' => ['required', Rule::in(['stock_in', 'stock_out', 'adjustment'])],
-            'quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
+            'type' => ['required', Rule::in(['stock_in', 'stock_out', 'waste', 'adjustment'])],
+            'quantity' => [
+                'required',
+                'numeric',
+                $request->input('type') === 'adjustment' ? 'min:0' : 'gt:0',
+                'max:999999999',
+            ],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -125,6 +158,11 @@ class InventoryController extends Controller
             return back()->withErrors(['quantity' => $exception->getMessage()]);
         }
 
-        return back()->with('success', 'Stock log recorded.');
+        return back()->with('success', match ($validated['type']) {
+            'stock_in' => 'Stock receipt recorded.',
+            'stock_out' => 'Stock removal recorded.',
+            'waste' => 'Waste recorded.',
+            'adjustment' => 'Stock count saved.',
+        });
     }
 }

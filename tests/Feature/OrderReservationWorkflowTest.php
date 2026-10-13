@@ -703,6 +703,131 @@ class OrderReservationWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_inventory_staff_page_uses_reference_tabs_and_sign_out(): void
+    {
+        $this->ingredient->update(['current_stock' => 0]);
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-page@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->get(route('inventory.index'))
+            ->assertOk()
+            ->assertSee('Barcode receiving')
+            ->assertSee('Count and waste')
+            ->assertSee('Stock movement history')
+            ->assertSee('Ingredient directory')
+            ->assertSee('Rice')
+            ->assertSee('Sign out')
+            ->assertSee('data-notification-toggle', false)
+            ->assertSee('aria-controls="inventoryNotifications"', false)
+            ->assertSee('Out of Stock')
+            ->assertSee('Restock required')
+            ->assertSee('id="inventoryNotifications"', false)
+            ->assertSee('id="alerts"', false)
+            ->assertSee('action="'.route('staff.logout').'"', false);
+
+        $this->post(route('staff.logout'))->assertRedirect(route('staff.login'));
+        $this->assertGuest();
+    }
+
+    public function test_inventory_staff_can_assign_a_package_barcode_to_an_ingredient(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-barcode@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.barcode'), [
+                'ingredient_id' => $this->ingredient->id,
+                'barcode' => '0123456789012',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Barcode assigned to Rice.');
+
+        $this->assertSame('0123456789012', $this->ingredient->fresh()->barcode);
+        $this->get(route('inventory.index'))
+            ->assertOk()
+            ->assertSee('data-barcode="0123456789012"', false)
+            ->assertSee('0123456789012')
+            ->assertSee('Register this package barcode');
+
+        $anotherIngredient = Ingredient::create([
+            'name' => 'Beans',
+            'current_stock' => 5,
+            'unit' => 'kg',
+            'min_threshold' => 1,
+        ]);
+        $this->post(route('staff.inventory.barcode'), [
+            'ingredient_id' => $anotherIngredient->id,
+            'barcode' => '0123456789012',
+        ])->assertSessionHasErrors('barcode');
+        $this->assertNull($anotherIngredient->fresh()->barcode);
+    }
+
+    public function test_inventory_staff_can_record_waste_with_a_reason(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-waste@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.log', $this->ingredient), [
+                'type' => 'waste',
+                'quantity' => 2,
+                'notes' => 'Spoiled during storage',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Waste recorded.');
+
+        $this->assertSame(8.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseHas('inventory_logs', [
+            'ingredient_id' => $this->ingredient->id,
+            'user_id' => $inventoryStaff->id,
+            'type' => 'waste',
+            'quantity' => -2,
+            'notes' => 'Spoiled during storage',
+        ]);
+    }
+
+    public function test_inventory_staff_can_save_a_zero_physical_count(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-count@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.log', $this->ingredient), [
+                'type' => 'adjustment',
+                'quantity' => 0,
+                'notes' => 'Empty shelf count',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Stock count saved.');
+
+        $this->assertSame(0.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseHas('inventory_logs', [
+            'ingredient_id' => $this->ingredient->id,
+            'user_id' => $inventoryStaff->id,
+            'type' => 'adjustment',
+            'quantity' => -10,
+            'stock_before' => 10,
+            'stock_after' => 0,
+        ]);
+    }
+
     public function test_cancelling_orders_releases_or_restores_their_stock_correctly(): void
     {
         $pendingOrder = $this->placeOrder(4);
@@ -854,6 +979,7 @@ class OrderReservationWorkflowTest extends TestCase
         Schema::create('ingredients', function ($table): void {
             $table->id();
             $table->string('name');
+            $table->string('barcode', 64)->nullable()->unique();
             $table->decimal('current_stock', 10, 3);
             $table->string('unit');
             $table->decimal('min_threshold', 10, 3)->default(0);

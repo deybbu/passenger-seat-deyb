@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ingredient extends Model
 {
-    protected $fillable = ['name', 'current_stock', 'unit', 'min_threshold', 'manual_override'];
+    protected $fillable = ['name', 'barcode', 'current_stock', 'unit', 'min_threshold', 'manual_override'];
 
     protected function casts(): array
     {

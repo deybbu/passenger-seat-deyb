@@ -100,6 +100,7 @@ Route::middleware(['auth', 'role:inventory'])
         Route::get('/', [InventoryController::class, 'index'])->name('inventory.index');
         Route::get('/logs', [InventoryController::class, 'logs'])->name('inventory.logs');
         Route::post('/', [InventoryController::class, 'store'])->name('staff.inventory.store');
+        Route::post('/barcode', [InventoryController::class, 'assignBarcode'])->name('staff.inventory.barcode');
         Route::patch('/{ingredient}', [InventoryController::class, 'update'])->name('staff.inventory.update');
         Route::post('/{ingredient}/logs', [InventoryController::class, 'log'])->name('staff.inventory.log');
         Route::delete('/{ingredient}', [InventoryController::class, 'destroy'])->name('staff.inventory.destroy');
