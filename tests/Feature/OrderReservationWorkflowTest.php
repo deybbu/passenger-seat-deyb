@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Ingredient;
+use App\Models\InventoryPackage;
+use App\Models\InventoryStockLot;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\PreparationRecipe;
 use App\Models\TableSession;
 use App\Models\User;
 use App\Services\InventoryService;
@@ -68,6 +71,13 @@ class OrderReservationWorkflowTest extends TestCase
             'current_stock' => 10,
             'unit' => 'kg',
             'min_threshold' => 1,
+        ]);
+        InventoryStockLot::create([
+            'ingredient_id' => $this->ingredient->id,
+            'received_quantity' => 10,
+            'remaining_quantity' => 10,
+            'receipt_token' => 'opening-stock-test',
+            'received_at' => now(),
         ]);
 
         DB::table('ingredient_menu_item')->insert([
@@ -167,7 +177,6 @@ class OrderReservationWorkflowTest extends TestCase
             'password' => 'password',
             'role' => 'admin',
         ]);
-
         $this->actingAs($admin)
             ->get(route('staff.tables.index'))
             ->assertForbidden();
@@ -608,7 +617,6 @@ class OrderReservationWorkflowTest extends TestCase
             'password' => 'password',
             'role' => 'inventory',
         ]);
-
         $this->actingAs($inventoryStaff)
             ->post(route('staff.inventory.log', $this->ingredient), [
                 'type' => 'stock_in',
@@ -628,6 +636,69 @@ class OrderReservationWorkflowTest extends TestCase
             'stock_before' => 1,
             'stock_after' => 2,
         ]);
+    }
+
+    public function test_manager_recipe_settings_drive_pos_costs_par_and_yield_loss_requirements(): void
+    {
+        $admin = User::create([
+            'name' => 'Recipe Manager',
+            'email' => 'recipe-manager@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'recipe-settings-inventory@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+        $settings = [
+            'unit_cost' => 3.25,
+            'yield_loss_percent' => 25,
+            'min_threshold' => 11,
+        ];
+
+        $this->actingAs($inventoryStaff)
+            ->patch(route('staff.inventory.recipe-settings', $this->ingredient), $settings)
+            ->assertForbidden();
+        $this->actingAs($admin)
+            ->patch(route('staff.inventory.recipe-settings', $this->ingredient), $settings)
+            ->assertRedirect(route('inventory.index', ['tab' => 'rcp']))
+            ->assertSessionHas('success', 'Recipe cost and par settings saved for Rice.');
+
+        $this->assertSame(3.25, (float) $this->ingredient->fresh()->unit_cost);
+        $this->assertSame(25.0, (float) $this->ingredient->fresh()->yield_loss_percent);
+        $this->assertSame(11.0, (float) $this->ingredient->fresh()->min_threshold);
+        $this->assertTrue($this->ingredient->fresh()->isLowStock());
+        $this->assertSame(2.0, $this->ingredient->fresh()->rawQuantityForPortion(1.5));
+        $this->assertTrue($this->menuItem->fresh()->isOrderable());
+
+        $this->actingAs($admin)
+            ->get(route('inventory.index', ['tab' => 'rcp']))
+            ->assertOk()
+            ->assertSee('<body data-role="mgr">', false)
+            ->assertSee('Manager / Owner')
+            ->assertSee('data-tab="rcp"', false)
+            ->assertSee('Recipe matrix, costs and par levels')
+            ->assertSee('Test meal · 1.500 kg per serving')
+            ->assertSee('₱6.50');
+
+        $order = $this->placeOrder(2);
+        $this->assertSame(4.0, (float) $order->ingredientReservations()->value('quantity'));
+        $this->orders->transition($order, 'preparing', $this->cashier);
+        $this->assertSame(6.0, (float) $this->ingredient->fresh()->current_stock);
+
+        $kitchen = User::create([
+            'name' => 'Kitchen Staff',
+            'email' => 'yield-loss-kitchen@example.test',
+            'password' => 'password',
+            'role' => 'kitchen',
+        ]);
+        $this->actingAs($kitchen)
+            ->get(route('staff.kitchen.index'))
+            ->assertOk()
+            ->assertSee('Raw needed per serving (with yield loss): 2 kg Rice')
+            ->assertSee('Low stock');
     }
 
     public function test_manual_stock_out_cannot_consume_reserved_ingredients(): void
@@ -664,6 +735,8 @@ class OrderReservationWorkflowTest extends TestCase
             ->post(route('admin.waste.store'), [
                 'ingredient_id' => $this->ingredient->id,
                 'quantity' => 2,
+                'reason' => 'Pre-Cook Spoilage',
+                'notes' => 'Pending order reservation',
             ])
             ->assertSessionHas('error');
         $this->assertDatabaseMissing('inventory_logs', [
@@ -672,11 +745,14 @@ class OrderReservationWorkflowTest extends TestCase
         ]);
 
         $this->orders->transition($order, 'cancelled', $this->cashier);
+        $openingLot = InventoryStockLot::query()->where('receipt_token', 'opening-stock-test')->firstOrFail();
+        $this->assertSame(10.0, (float) $openingLot->fresh()->remaining_quantity);
 
         $this->actingAs($admin)
             ->post(route('admin.waste.store'), [
                 'ingredient_id' => $this->ingredient->id,
                 'quantity' => 2,
+                'reason' => 'Other',
                 'notes' => 'Damaged ingredient',
             ])
             ->assertSessionHas('status');
@@ -716,10 +792,22 @@ class OrderReservationWorkflowTest extends TestCase
         $this->actingAs($inventoryStaff)
             ->get(route('inventory.index'))
             ->assertOk()
-            ->assertSee('Barcode receiving')
-            ->assertSee('Count and waste')
-            ->assertSee('Stock movement history')
-            ->assertSee('Ingredient directory')
+            ->assertSee('<body data-role="staff">', false)
+            ->assertSee('Kitchen Staff')
+            ->assertDontSee('Manager / Owner')
+            ->assertSee('Fresh intake')
+            ->assertSee('Stock board')
+            ->assertSee('Prep and waste')
+            ->assertSee('History')
+            ->assertDontSee('data-tab="rcp"', false)
+            ->assertDontSee('Loss report (managers)')
+            ->assertDontSee('Preparation recipes · managers')
+            ->assertSee('Scan package')
+            ->assertSee('Fresh goods')
+            ->assertSee('Stock by expiry')
+            ->assertSee('Raw to prep')
+            ->assertSee('Recipe matrix, costs and par levels')
+            ->assertSee('Movement history')
             ->assertSee('Rice')
             ->assertSee('Sign out')
             ->assertSee('data-notification-toggle', false)
@@ -727,7 +815,6 @@ class OrderReservationWorkflowTest extends TestCase
             ->assertSee('Out of Stock')
             ->assertSee('Restock required')
             ->assertSee('id="inventoryNotifications"', false)
-            ->assertSee('id="alerts"', false)
             ->assertSee('action="'.route('staff.logout').'"', false);
 
         $this->post(route('staff.logout'))->assertRedirect(route('staff.login'));
@@ -771,8 +858,278 @@ class OrderReservationWorkflowTest extends TestCase
         $this->assertNull($anotherIngredient->fresh()->barcode);
     }
 
+    public function test_package_scan_returns_server_preview_without_changing_stock(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-scan@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+        InventoryPackage::create([
+            'ingredient_id' => $this->ingredient->id,
+            'barcode' => '0123456789012',
+            'label' => 'Rice 2 kg bag',
+            'package_quantity' => 2,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->postJson(route('staff.inventory.receive.lookup'), ['barcode' => '0123456789012'])
+            ->assertOk()
+            ->assertJsonPath('ingredient.name', 'Rice')
+            ->assertJsonPath('current_stock', 10)
+            ->assertJsonPath('package_quantity', 2)
+            ->assertJsonPath('expected_stock', 12);
+
+        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseCount('inventory_stock_lots', 1);
+        $this->assertDatabaseCount('inventory_logs', 0);
+
+        $this->actingAs($inventoryStaff)
+            ->get(route('inventory.index'))
+            ->assertOk()
+            ->assertSee('Try sample scan')
+            ->assertSee('data-sample-package', false)
+            ->assertSee('data-code="0123456789012"', false);
+    }
+
+    public function test_inventory_staff_can_register_an_unknown_package_barcode_without_receiving_stock(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-package@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->postJson(route('staff.inventory.packages.store'), [
+                'ingredient_id' => $this->ingredient->id,
+                'barcode' => '9988776655443',
+                'label' => 'Rice 3 kg sack',
+                'package_quantity' => 3,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('package_quantity', 3)
+            ->assertJsonPath('expected_stock', 13);
+
+        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseHas('inventory_packages', [
+            'ingredient_id' => $this->ingredient->id,
+            'barcode' => '9988776655443',
+            'package_quantity' => 3,
+        ]);
+        $this->assertDatabaseCount('inventory_stock_lots', 1);
+        $this->assertDatabaseCount('inventory_logs', 0);
+    }
+
+    public function test_confirmed_package_receipt_updates_stock_once_and_records_its_lot(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-receive@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+        InventoryPackage::create([
+            'ingredient_id' => $this->ingredient->id,
+            'barcode' => '0123456789012',
+            'label' => 'Rice 2 kg bag',
+            'package_quantity' => 2,
+            'is_active' => true,
+        ]);
+        $payload = [
+            'barcode' => '0123456789012',
+            'receipt_token' => (string) Str::uuid(),
+            'batch_number' => 'BATCH-42',
+            'expires_at' => '2027-05-01 00:00:00',
+            'storage_zone' => 'Dry Pantry Room',
+        ];
+
+        $this->actingAs($inventoryStaff)
+            ->postJson(route('staff.inventory.receive.confirm'), $payload)
+            ->assertCreated()
+            ->assertJsonPath('current_stock', 10)
+            ->assertJsonPath('package_quantity', 2)
+            ->assertJsonPath('expected_stock', 12);
+
+        $this->assertSame(12.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseHas('inventory_stock_lots', [
+            'ingredient_id' => $this->ingredient->id,
+            'batch_number' => 'BATCH-42',
+            'expires_at' => '2027-05-01 00:00:00',
+            'received_quantity' => 2,
+            'remaining_quantity' => 2,
+            'received_by' => $inventoryStaff->id,
+            'storage_zone' => 'Dry Pantry Room',
+        ]);
+        $lot = InventoryStockLot::query()->where('receipt_token', $payload['receipt_token'])->firstOrFail();
+        $this->assertDatabaseHas('inventory_logs', [
+            'ingredient_id' => $this->ingredient->id,
+            'stock_lot_id' => $lot->id,
+            'user_id' => $inventoryStaff->id,
+            'type' => 'stock_in',
+            'quantity' => 2,
+            'stock_before' => 10,
+            'stock_after' => 12,
+        ]);
+
+        $this->postJson(route('staff.inventory.receive.confirm'), $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'This receipt was already confirmed. Scan the package again for a new delivery.');
+
+        $this->assertSame(12.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseCount('inventory_stock_lots', 2);
+        $this->assertDatabaseCount('inventory_logs', 1);
+    }
+
+    public function test_unknown_barcode_is_rejected_without_changing_stock(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-unknown@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+
+        $this->actingAs($inventoryStaff)
+            ->postJson(route('staff.inventory.receive.lookup'), ['barcode' => 'UNKNOWN-42'])
+            ->assertNotFound()
+            ->assertJsonPath('can_register', true);
+
+        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseCount('inventory_stock_lots', 1);
+    }
+
+    public function test_fresh_goods_receipt_creates_a_real_ingredient_lot_and_movement(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'fresh-goods@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+        $expiryDate = today()->addDays(30)->toDateString();
+
+        $freshReceipt = [
+            'name' => 'Fresh squid',
+            'category' => 'Seafood',
+            'quantity' => 2.5,
+            'unit' => 'kg',
+            'batch_number' => 'SQ-2026-05',
+            'expires_at' => $expiryDate,
+            'storage_zone' => 'Chiller',
+            'receipt_token' => (string) Str::uuid(),
+        ];
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.receive.fresh'), $freshReceipt)
+            ->assertRedirect(route('inventory.index', ['tab' => 'dash']))
+            ->assertSessionHas('success', 'Received 2.5 kg of Fresh squid.');
+
+        $freshIngredient = Ingredient::query()->where('name', 'Fresh squid')->firstOrFail();
+        $this->assertSame(2.5, (float) $freshIngredient->current_stock);
+        $lot = InventoryStockLot::query()->where('ingredient_id', $freshIngredient->id)->firstOrFail();
+        $this->assertSame('SQ-2026-05', $lot->batch_number);
+        $this->assertSame('Chiller', $lot->storage_zone);
+        $this->assertSame(2.5, (float) $lot->remaining_quantity);
+        $this->assertDatabaseHas('inventory_logs', [
+            'ingredient_id' => $freshIngredient->id,
+            'stock_lot_id' => $lot->id,
+            'type' => 'stock_in',
+            'quantity' => 2.5,
+            'user_id' => $inventoryStaff->id,
+        ]);
+        $this->get(route('inventory.index'))
+            ->assertOk()
+            ->assertSee('Stock by expiry (oldest used first)')
+            ->assertSee('Fresh squid')
+            ->assertSee('SQ-2026-05')
+            ->assertSee('Usable unexpired stock: 2.500 kg');
+
+        $this->post(route('staff.inventory.receive.fresh'), $freshReceipt)
+            ->assertRedirect(route('inventory.index', ['tab' => 'fresh']))
+            ->assertSessionHasErrors('fresh');
+        $this->assertSame(2.5, (float) $freshIngredient->fresh()->current_stock);
+        $this->assertSame(1, InventoryStockLot::query()->where('ingredient_id', $freshIngredient->id)->count());
+    }
+
+    public function test_stock_out_uses_unexpired_lots_in_fefo_order_and_skips_expired_lots(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'fefo@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+        InventoryStockLot::query()->where('ingredient_id', $this->ingredient->id)->delete();
+        $expiredLot = InventoryStockLot::create([
+            'ingredient_id' => $this->ingredient->id,
+            'batch_number' => 'EXPIRED',
+            'expires_at' => today()->subDay(),
+            'received_quantity' => 3,
+            'remaining_quantity' => 3,
+            'receipt_token' => 'fefo-expired',
+        ]);
+        $firstUsableLot = InventoryStockLot::create([
+            'ingredient_id' => $this->ingredient->id,
+            'batch_number' => 'FIRST-EXPIRY',
+            'expires_at' => today()->addDay(),
+            'received_quantity' => 4,
+            'remaining_quantity' => 4,
+            'receipt_token' => 'fefo-first',
+        ]);
+        $secondUsableLot = InventoryStockLot::create([
+            'ingredient_id' => $this->ingredient->id,
+            'batch_number' => 'SECOND-EXPIRY',
+            'expires_at' => today()->addDays(8),
+            'received_quantity' => 6,
+            'remaining_quantity' => 6,
+            'receipt_token' => 'fefo-second',
+        ]);
+        $this->ingredient->update(['current_stock' => 13]);
+
+        app(InventoryService::class)->logMovement(
+            $this->ingredient,
+            'stock_out',
+            5,
+            $inventoryStaff,
+            'Kitchen use',
+        );
+
+        $this->assertSame(8.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertSame(3.0, (float) $expiredLot->fresh()->remaining_quantity);
+        $this->assertSame(0.0, (float) $firstUsableLot->fresh()->remaining_quantity);
+        $this->assertSame(5.0, (float) $secondUsableLot->fresh()->remaining_quantity);
+        $this->assertDatabaseHas('inventory_logs', [
+            'stock_lot_id' => $firstUsableLot->id,
+            'type' => 'stock_out',
+            'quantity' => 4,
+            'stock_before' => 13,
+            'stock_after' => 9,
+        ]);
+        $this->assertDatabaseHas('inventory_logs', [
+            'stock_lot_id' => $secondUsableLot->id,
+            'type' => 'stock_out',
+            'quantity' => 1,
+            'stock_before' => 9,
+            'stock_after' => 8,
+        ]);
+    }
+
+    public function test_menu_availability_does_not_offer_expired_lot_stock(): void
+    {
+        InventoryStockLot::query()->where('ingredient_id', $this->ingredient->id)->update([
+            'expires_at' => today()->subDay(),
+        ]);
+
+        $this->assertFalse($this->menuItem->isOrderable());
+    }
+
     public function test_inventory_staff_can_record_waste_with_a_reason(): void
     {
+        $this->ingredient->update(['unit_cost' => 3.5]);
         $inventoryStaff = User::create([
             'name' => 'Inventory Staff',
             'email' => 'inventory-waste@example.test',
@@ -781,13 +1138,33 @@ class OrderReservationWorkflowTest extends TestCase
         ]);
 
         $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.waste'), [
+                'ingredient_id' => $this->ingredient->id,
+                'quantity' => 2,
+                'notes' => 'Reason is missing',
+            ])
+            ->assertSessionHasErrors('reason');
+        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+
+        $this->actingAs($inventoryStaff)
             ->post(route('staff.inventory.log', $this->ingredient), [
                 'type' => 'waste',
                 'quantity' => 2,
+                'notes' => 'Attempt to skip the reason field',
+            ])
+            ->assertSessionHasErrors('type');
+        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.waste'), [
+                'ingredient_id' => $this->ingredient->id,
+                'quantity' => 2,
+                'reason' => 'Pre-Cook Spoilage',
                 'notes' => 'Spoiled during storage',
             ])
             ->assertRedirect()
-            ->assertSessionHas('success', 'Waste recorded.');
+            ->assertSessionHas('success', 'Waste recorded. Estimated cost: ₱7.00.')
+            ->assertSessionHas('waste_estimate', 7.0);
 
         $this->assertSame(8.0, (float) $this->ingredient->fresh()->current_stock);
         $this->assertDatabaseHas('inventory_logs', [
@@ -795,8 +1172,123 @@ class OrderReservationWorkflowTest extends TestCase
             'user_id' => $inventoryStaff->id,
             'type' => 'waste',
             'quantity' => -2,
+            'reason' => 'Pre-Cook Spoilage',
             'notes' => 'Spoiled during storage',
+            'cost_amount' => 7,
         ]);
+
+        $this->get(route('inventory.index'))
+            ->assertOk()
+            ->assertDontSee('Loss report (managers)');
+
+        $admin = User::create([
+            'name' => 'Inventory Manager',
+            'email' => 'inventory-manager@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+        $this->actingAs($admin)
+            ->get(route('admin.waste'))
+            ->assertOk()
+            ->assertSee('Reason and details')
+            ->assertSee('Estimated cost');
+
+        $this->actingAs($admin)
+            ->get(route('inventory.index'))
+            ->assertOk()
+            ->assertSee('<body data-role="mgr">', false)
+            ->assertSee('Manager / Owner')
+            ->assertSee('data-tab="rcp"', false)
+            ->assertSee('Loss report (managers)')
+            ->assertSee('Spoiled during storage')
+            ->assertSee('All-time known estimated cost: ₱7.00.');
+    }
+
+    public function test_manager_can_configure_and_inventory_staff_can_record_preparation(): void
+    {
+        $inventoryStaff = User::create([
+            'name' => 'Inventory Staff',
+            'email' => 'inventory-prep@example.test',
+            'password' => 'password',
+            'role' => 'inventory',
+        ]);
+        $preparedIngredient = Ingredient::create([
+            'name' => 'Prepared rice',
+            'current_stock' => 0,
+            'unit' => 'kg',
+            'min_threshold' => 0,
+        ]);
+        $recipePayload = [
+            'output_ingredient_id' => $preparedIngredient->id,
+            'yield_quantity' => 0.8,
+            'lines' => [
+                ['ingredient_id' => $this->ingredient->id, 'quantity' => 2],
+            ],
+        ];
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.preparation-recipes.store'), $recipePayload)
+            ->assertForbidden();
+
+        $admin = User::create([
+            'name' => 'Inventory Manager',
+            'email' => 'inventory-prep-manager@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+        $this->actingAs($admin)
+            ->post(route('staff.inventory.preparation-recipes.store'), $recipePayload)
+            ->assertRedirect(route('inventory.index', ['tab' => 'prep']))
+            ->assertSessionHas('success', 'Preparation recipe saved.');
+        $recipe = PreparationRecipe::query()->with('lines')->firstOrFail();
+
+        $earlyLot = InventoryStockLot::create([
+            'ingredient_id' => $this->ingredient->id,
+            'batch_number' => 'EARLY-RAW',
+            'expires_at' => today()->addDay(),
+            'received_quantity' => 2,
+            'remaining_quantity' => 2,
+            'receipt_token' => 'prep-early-raw',
+            'storage_zone' => 'Chiller',
+        ]);
+        $this->ingredient->update(['current_stock' => 12]);
+
+        $this->actingAs($inventoryStaff)
+            ->post(route('staff.inventory.prepare'), [
+                'preparation_recipe_id' => $recipe->id,
+                'batches' => 1,
+            ])
+            ->assertRedirect(route('inventory.index', ['tab' => 'prep']))
+            ->assertSessionHas('success', 'Prepared 0.8 kg of Prepared rice.');
+
+        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertSame(0.0, (float) $earlyLot->fresh()->remaining_quantity);
+        $this->assertSame(0.8, (float) $preparedIngredient->fresh()->current_stock);
+        $outputLot = InventoryStockLot::query()
+            ->where('ingredient_id', $preparedIngredient->id)
+            ->firstOrFail();
+        $this->assertSame(today()->addDay()->toDateString(), $outputLot->expires_at->toDateString());
+        $this->assertSame('Chiller', $outputLot->storage_zone);
+        $this->assertDatabaseHas('inventory_logs', [
+            'ingredient_id' => $this->ingredient->id,
+            'stock_lot_id' => $earlyLot->id,
+            'user_id' => $inventoryStaff->id,
+            'type' => 'prep_out',
+            'quantity' => -2,
+        ]);
+        $this->assertDatabaseHas('inventory_logs', [
+            'ingredient_id' => $preparedIngredient->id,
+            'stock_lot_id' => $outputLot->id,
+            'user_id' => $inventoryStaff->id,
+            'type' => 'prep_in',
+            'quantity' => 0.8,
+        ]);
+
+        $this->get(route('inventory.index', ['tab' => 'log']))
+            ->assertOk()
+            ->assertSee('Movement history')
+            ->assertSee('Prep out')
+            ->assertSee('Prep in');
     }
 
     public function test_inventory_staff_can_save_a_zero_physical_count(): void
@@ -980,9 +1472,12 @@ class OrderReservationWorkflowTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('barcode', 64)->nullable()->unique();
+            $table->string('category', 80)->nullable();
             $table->decimal('current_stock', 10, 3);
             $table->string('unit');
+            $table->decimal('unit_cost', 12, 4)->nullable();
             $table->decimal('min_threshold', 10, 3)->default(0);
+            $table->decimal('yield_loss_percent', 5, 2)->default(0);
             $table->boolean('manual_override')->default(false);
             $table->timestamps();
         });
@@ -1004,7 +1499,54 @@ class OrderReservationWorkflowTest extends TestCase
             $table->decimal('stock_before', 10, 3)->nullable();
             $table->decimal('stock_after', 10, 3)->nullable();
             $table->string('notes')->nullable();
+            $table->string('reason', 80)->nullable();
+            $table->decimal('cost_amount', 12, 4)->nullable();
             $table->timestamps();
+        });
+
+        Schema::create('inventory_packages', function ($table): void {
+            $table->id();
+            $table->foreignId('ingredient_id');
+            $table->string('barcode', 64)->unique();
+            $table->string('label', 120);
+            $table->decimal('package_quantity', 12, 3);
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('inventory_stock_lots', function ($table): void {
+            $table->id();
+            $table->foreignId('ingredient_id');
+            $table->foreignId('package_id')->nullable();
+            $table->string('batch_number', 120)->nullable();
+            $table->date('expires_at')->nullable();
+            $table->decimal('received_quantity', 12, 3);
+            $table->decimal('remaining_quantity', 12, 3);
+            $table->decimal('unit_cost', 12, 4)->nullable();
+            $table->string('receipt_token', 64)->unique();
+            $table->foreignId('received_by')->nullable();
+            $table->timestamp('received_at')->nullable();
+            $table->string('storage_zone', 80)->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('preparation_recipes', function ($table): void {
+            $table->id();
+            $table->foreignId('output_ingredient_id')->unique();
+            $table->decimal('yield_quantity', 12, 3);
+            $table->timestamps();
+        });
+
+        Schema::create('preparation_recipe_lines', function ($table): void {
+            $table->id();
+            $table->foreignId('preparation_recipe_id');
+            $table->foreignId('ingredient_id');
+            $table->decimal('quantity', 12, 3);
+            $table->timestamps();
+        });
+
+        Schema::table('inventory_logs', function ($table): void {
+            $table->foreignId('stock_lot_id')->nullable();
         });
 
         Schema::create('order_status_histories', function ($table): void {

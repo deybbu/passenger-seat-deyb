@@ -162,23 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (button.hasAttribute('data-order-filter')) {
             activeFilter = button.dataset.orderFilter;
             applyFilter();
-        } else if (button.hasAttribute('data-kitchen-theme')) {
-            const root = document.documentElement;
-            const currentTheme = root.dataset.theme
-                ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-            root.dataset.theme = nextTheme;
-            window.localStorage.setItem('passenger-seat-theme', nextTheme);
-            button.setAttribute('aria-label', `Switch to ${nextTheme === 'dark' ? 'light' : 'dark'} mode`);
         }
     });
-
-    const savedTheme = window.localStorage.getItem('passenger-seat-theme');
-
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-        document.documentElement.dataset.theme = savedTheme;
-    }
 
     updateClock();
     updateTimers();

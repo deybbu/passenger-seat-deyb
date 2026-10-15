@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Barcode receiving · Passenger Seat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--red:#C62828;--deep:#A61B1B;--acc:#E53935;--bg:#F8F8FA;--gray:#F1F2F4;--ink:#202124;--mute:#6B7280;--line:#E5E7EB;--ok:#15803D;--warn:#D97706;--err:#DC2626;--surf:#fff;--glass:rgba(255,255,255,.78);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141214;--gray:#241f21;--ink:#f3eded;--mute:#a79c9e;--line:#3a3033;--surf:#1d1819;--glass:rgba(32,26,28,.78);--red:#e04848;--deep:#c62828}}
+:root[data-theme="dark"]{--bg:#141214;--gray:#241f21;--ink:#f3eded;--mute:#a79c9e;--line:#3a3033;--surf:#1d1819;--glass:rgba(32,26,28,.78);--red:#e04848;--deep:#c62828}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,system-ui,sans-serif}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 24px;background:var(--glass);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-size:20px;font-weight:700}.crumb{font-size:11px;color:var(--mute)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px}
+.av{width:32px;height:32px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+.bell{position:relative;border:1px solid var(--line);background:var(--surf);border-radius:10px;width:36px;height:36px;color:var(--ink);cursor:pointer}
+.bell i{position:absolute;top:5px;right:5px;min-width:16px;height:16px;border-radius:8px;background:var(--red);color:#fff;font:700 10px/16px Inter;text-align:center;font-style:normal}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;color:var(--mute);font:600 14px Inter;padding:10px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--red);border-color:var(--red)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 8px 32px rgba(90,20,20,.06)}
+.card h2{margin:0 0 12px;font-size:14px;font-weight:700}
+.scanner{max-width:420px;margin:0 auto;width:100%;background:var(--glass);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.cam{position:relative;aspect-ratio:1/1;border-radius:14px;background:#111;overflow:hidden;display:grid;place-items:center}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.frame{position:relative;width:62%;aspect-ratio:1;border:2px solid var(--acc);border-radius:14px;background:rgba(255,255,255,.04)}
+.frame.live::after{content:"";position:absolute;left:6%;right:6%;top:10%;height:2px;background:var(--acc);box-shadow:0 0 10px var(--acc);animation:sweep 2s ease-in-out infinite alternate}
+@keyframes sweep{to{top:88%}}
+.hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-size:11px;padding:0 10px}
+.btns{display:flex;gap:8px;margin-top:12px}.btns>*{flex:1}
+.btn{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font:600 13px Inter;cursor:pointer;padding:0 14px;transition:background .2s,transform .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff}.btn.red:hover{background:var(--deep)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+input,select{font:inherit;color:var(--ink);background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;max-width:100%}
+.manual{display:flex;gap:8px;margin-top:12px}.manual input{flex:1;min-width:0}
+.msg{margin-top:12px;padding:10px 12px;border-radius:10px;font-weight:600;font-size:13px;background:var(--gray);color:var(--mute)}
+.msg.ok{background:#dcfce7;color:var(--ok)}.msg.bad{background:#fee2e2;color:var(--err)}.msg.warn{background:#fef3c7;color:#92400e}
+.pkg{margin-top:12px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--surf)}
+.pkg h3{margin:0 0 6px;font-size:14px}.pkg p{margin:2px 0;color:var(--mute)}.pkg .big{color:var(--ink);font-weight:700}
+.qty{display:inline-flex;align-items:center;gap:8px;margin:6px 0}.qty button{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font-size:18px;cursor:pointer}
+.chips{margin-top:12px;font-size:12px;color:var(--mute);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:1px dashed var(--mute);background:none;color:var(--ink);border-radius:99px;padding:4px 10px;font:12px Inter;cursor:pointer;min-height:32px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mute);font-weight:600;font-size:12px}th,td{padding:8px 6px;border-bottom:1px solid var(--line)}tbody tr:nth-child(even){background:var(--gray)}
+.badge{display:inline-flex;gap:4px;align-items:center;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700}
+.b-ok{background:#dcfce7;color:var(--ok)}.b-low{background:#fee2e2;color:var(--err)}.b-w{background:#fef3c7;color:#92400e}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}.row label{display:grid;gap:4px;font-size:12px;color:var(--mute);font-weight:600}
+.ovg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.ov{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:12px;font-size:12px;color:var(--mute)}.ov b{display:block;font-size:22px;color:var(--ink)}.al{display:grid;gap:6px;margin:12px 0}.al div{padding:8px 12px;border-radius:10px;font-size:13px;font-weight:600}.al .c{background:#fee2e2;color:var(--err)}.al .w{background:#fef3c7;color:#92400e}.al .i{background:var(--gray)}.fl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.fl input{flex:1;min-width:140px}
+.hide{display:none!important}.mute{color:var(--mute)}
+#toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:9}
+#toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body>
+<div class="top">
+  <div><h1 id="title">Barcode receiving</h1><div class="crumb">Passenger Seat / <span id="crumb">Barcode receiving</span></div></div>
+  <div class="who"><button class="bell" id="bell" aria-label="Low-stock alerts">&#9888;<i id="bn">0</i></button><span class="av">RS</span><span>Staff 1042</span></div>
+</div>
+<main>
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-t="in" aria-selected="true">Receive</button>
+    <button role="tab" data-t="out" aria-selected="false">Stock out</button>
+    
+    <button role="tab" data-t="count" aria-selected="false">Count and waste</button>
+    <button role="tab" data-t="log" aria-selected="false">History</button>
+    <button role="tab" data-t="inv" aria-selected="false">Inventory</button>
+  </div>
+
+  <section id="scanView">
+   <div class="card scanner">
+    <h2 id="scanTitle">Scan package</h2>
+    <div class="cam"><video id="vid" playsinline muted class="hide"></video><div class="frame" id="frame"></div><div class="hint" id="hint">Point the rear camera at the package barcode</div></div>
+    <div class="btns"><button class="btn red" id="camBtn">Start camera</button><button class="btn" id="sample">Try sample scan</button></div>
+    <form class="manual" id="manual"><input id="code" autocomplete="off" aria-label="Barcode" placeholder="Type or scan a barcode"><button class="btn" type="submit">Look up</button></form>
+    <div class="chips">Samples: <span id="chips"></span></div>
+    <div class="msg" id="msg" aria-live="polite">Waiting for a barcode. Stock changes only after you confirm.</div>
+    <div class="pkg hide" id="pkg">
+      <h3 id="pName"></h3><p id="pMeta"></p><p id="pCur"></p>
+      <div class="qty"><button id="qm" aria-label="Decrease">&minus;</button><b id="pQty"></b><button id="qp" aria-label="Increase">+</button></div>
+      <p class="big" id="pAfter"></p>
+      <div class="btns"><button class="btn red" id="confirm">Confirm receipt</button><button class="btn" id="rescan">Rescan</button></div>
+    </div>
+   </div>
+  </section>
+
+  <section id="invView" class="card hide"><h2>Inventory overview</h2>
+    <div class="ovg" id="ov"></div>
+    <h2 style="margin-top:16px">Alerts and restocking</h2><div class="al" id="al"></div>
+    <h2>Ingredient directory</h2>
+    <div class="fl"><input id="iq" placeholder="Search name or barcode" aria-label="Search"><select id="ic" aria-label="Category"></select><select id="is" aria-label="Status"><option value="">All statuses</option><option>OK</option><option>Low</option><option>Out</option></select></div>
+    <div class="wrap"><table><thead><tr><th>Ingredient</th><th>Category</th><th>Barcode</th><th>Stock</th><th>Min</th><th>Scan adds</th><th>Supplier</th><th>Expiry</th><th>Value</th><th>Status</th></tr></thead><tbody id="invBody"></tbody></table></div></section>
+
+
+
+  <section id="countView" class="card hide"><h2>Physical count</h2>
+    <div class="wrap"><table><thead><tr><th>Item</th><th>System</th><th>Counted</th><th>Variance</th><th>Explanation</th><th>Low mark</th></tr></thead><tbody id="cBody"></tbody></table></div>
+    <div class="row" style="margin-top:10px"><button class="btn red" id="cSave">Save adjustments</button><span class="mute" id="cMsg"></span></div>
+    <h2 style="margin-top:16px">Waste summary</h2><p class="mute">Variances saved with a waste reason are counted here.</p><div class="wrap"><table><thead><tr><th>Reason</th><th>Total lost</th></tr></thead><tbody id="wsBody"></tbody></table></div></section>
+
+  <section id="logView" class="card hide"><h2>Stock movement history</h2>
+    <div class="fl"><select id="lf" aria-label="Filter by action"><option value="">All movements</option><option>Received</option><option>Order</option><option>Count</option><option>Min</option></select><button class="btn" id="lCsv">Copy CSV</button><button class="btn" id="lPrint">Print</button></div>
+    <div class="wrap"><table><thead><tr><th>Time</th><th>Staff</th><th>Action</th><th>Item</th><th>Change</th><th>Note</th></tr></thead><tbody id="lBody"></tbody></table></div></section>
+
+  <div class="grid" id="stockGrid">
+    <section class="card"><h2>Stock board</h2><div class="wrap"><table><thead><tr><th>Item</th><th>Stock</th><th>Min</th><th>Usage/day</th><th>Days left</th></tr></thead><tbody id="board"></tbody></table></div></section>
+    <section class="card"><h2>This session</h2><div class="wrap"><table><thead><tr><th>Item</th><th>Change</th></tr></thead><tbody id="sess"></tbody></table></div>
+      <p class="mute" id="sSum"></p></section>
+  </div>
+</main>
+<div id="toast" role="status"></div>
+<script>
+const STAFF=1042;
+const D=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
+const items=[
+{id:"CH",name:"Chicken",cat:"Meat",unit:"kg",stock:100,min:60,vel:12,cost:180,sup:"Supplier A",def:50,exp:D(4)},
+{id:"RI",name:"Jasmine rice",cat:"Dry goods",unit:"kg",stock:80,min:50,vel:15,cost:55,sup:"Supplier B",def:25,exp:D(150)},
+{id:"OI",name:"Cooking oil",cat:"Pantry",unit:"L",stock:18,min:20,vel:6,cost:95,sup:"Supplier B",def:20,exp:D(90)},
+{id:"TO",name:"Tomatoes",cat:"Produce",unit:"kg",stock:9,min:10,vel:4,cost:70,sup:"Supplier C",def:5,exp:D(3)}];
+const pkgs=[
+{code:"4800101002210",item:"CH",qty:50,batch:"B-2210",exp:"2026-11-02"},
+{code:"4800102005521",item:"RI",qty:25,batch:"B-5521",exp:"2027-03-15"},
+{code:"4800103001187",item:"OI",qty:20,batch:"B-1187",exp:"2027-01-10"},
+{code:"4800104003304",item:"TO",qty:5,batch:"B-3304",exp:"2026-10-17"}];
+const received=new Set(), sess={}, log=[];
+let mode="in",cur=null,stream=null,timer=null;
+const $=id=>document.getElementById(id), it=id=>items.find(i=>i.id===id);
+const toast=t=>{const e=$("toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2200)};
+const msg=(c,t)=>{const m=$("msg");m.className="msg "+c;m.textContent=t};
+const stamp=(a,i,d,n)=>{log.unshift({t:new Date().toLocaleTimeString(),a,n:i.name,d,note:n||""});renderLog()};
+
+function lookup(raw){
+  const code=raw.trim().replace(/\s/g,""); if(!code) return;
+  const p=pkgs.find(x=>x.code===code);
+  if(!p){cur=null;$("pkg").classList.add("hide");msg("bad","Invalid barcode: "+code+". It isn't registered to any package.");return}
+  if(mode==="in"&&received.has(code)){cur=null;$("pkg").classList.add("hide");msg("warn","Duplicate receipt: batch "+p.batch+" was already received.");return}
+  cur={...p,q:p.qty};stopCam();showPkg();
+  msg("ok","Package found. Check the details, then confirm.");
+}
+function showPkg(){
+  const i=it(cur.item),sign=mode==="in"?1:-1;
+  $("pkg").classList.remove("hide");
+  $("pName").textContent=i.name+" · Batch "+cur.batch;
+  $("pMeta").textContent="Expiry "+cur.exp+" · "+i.cat;
+  $("pCur").textContent="Current stock: "+i.stock+" "+i.unit;
+  $("pQty").textContent=(sign>0?"Package quantity: +":"Quantity out: −")+cur.q+" "+i.unit;
+  const after=i.stock+sign*cur.q;
+  $("pAfter").textContent="Expected after "+(sign>0?"receipt":"stock out")+": "+after+" "+i.unit;
+  $("confirm").textContent=sign>0?"Confirm receipt":"Confirm stock out";
+  $("confirm").disabled=after<0;
+}
+$("pMeta").textContent="";
+$("qm").onclick=()=>{if(cur&&cur.q>1){cur.q--;showPkg()}};
+$("qp").onclick=()=>{if(cur){cur.q++;showPkg()}};
+$("confirm").onclick=()=>{
+  if(!cur)return; const i=it(cur.item),d=(mode==="in"?1:-1)*cur.q;
+  if(i.stock+d<0)return;
+  i.stock+=d; if(mode==="in")received.add(cur.code);
+  sess[mode+i.id]=(sess[mode+i.id]||0)+d;
+  stamp(mode==="in"?"Received":"Stock out",i,d,"Batch "+cur.batch);
+  msg("ok",(d>0?"+":"")+d+" "+i.unit+" "+i.name+" recorded. Stock is now "+i.stock+" "+i.unit+".");
+  toast("Saved: "+i.name+" "+(d>0?"+":"")+d+" "+i.unit);
+  cur=null;$("pkg").classList.add("hide");renderAll();
+};
+$("rescan").onclick=()=>{cur=null;$("pkg").classList.add("hide");msg("","Waiting for a barcode.");$("code").focus()};
+$("manual").onsubmit=e=>{e.preventDefault();lookup($("code").value);$("code").value=""};
+$("sample").onclick=()=>{const free=pkgs.filter(p=>mode!=="in"||!received.has(p.code));lookup((free[0]||pkgs[0]).code)};
+$("chips").innerHTML=pkgs.map(p=>"<button class='chip' data-c='"+p.code+"'>"+it(p.item).name+"</button>").join("")+"<button class='chip' data-c='0000000000000'>Unknown</button>";
+$("chips").onclick=e=>{if(e.target.dataset.c)lookup(e.target.dataset.c)};
+
+/* camera + BarcodeDetector */
+async function startCam(){
+  if(stream){stopCam();return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){msg("warn","Camera isn't available in this browser or page. Use the manual field.");return}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    const v=$("vid");v.srcObject=stream;v.classList.remove("hide");await v.play();
+    $("frame").classList.add("live");$("camBtn").textContent="Stop camera";$("hint").textContent="Hold the barcode inside the red frame";
+    if(!("BarcodeDetector" in window)){msg("warn","Camera is on, but this browser can't read barcodes automatically. Type the code below.");return}
+    const det=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","upc_a","upc_e","qr_code"]});
+    msg("","Scanning…");
+    timer=setInterval(async()=>{try{const r=await det.detect(v);if(r.length){lookup(r[0].rawValue)}}catch(e){}},300);
+  }catch(err){
+    stopCam();
+    msg("bad",err.name==="NotAllowedError"?"Camera permission was denied. Allow camera access in your browser settings, or type the code.":"Couldn't start the camera ("+err.name+"). Use the manual field.");
+  }
+}
+function stopCam(){
+  clearInterval(timer);timer=null;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  $("vid").classList.add("hide");$("frame").classList.remove("live");$("camBtn").textContent="Start camera";$("hint").textContent="Point the rear camera at the package barcode";
+}
+$("camBtn").onclick=startCam;
+
+/* renders */
+const dl=i=>i.vel?i.stock/i.vel:Infinity;
+function renderAll(){
+  const low=items.filter(i=>i.stock<=i.min);$("bn").textContent=low.length;
+  $("board").innerHTML=items.map(i=>{const d=dl(i),isLow=i.stock<=i.min;
+    return "<tr><td>"+i.name+"</td><td>"+i.stock+" "+i.unit+(isLow?" <span class='badge b-low'>&#9888; Low</span>":"")+"</td><td>"+i.min+"</td><td>"+i.vel+" "+i.unit+"</td><td><span class='badge "+(d<2?"b-low":d<4?"b-w":"b-ok")+"'>"+d.toFixed(1)+" days</span></td></tr>"}).join("");
+  const ks=Object.keys(sess).filter(k=>sess[k]);
+  $("sess").innerHTML=ks.length?ks.map(k=>{const i=it(k.slice(-2)),d=sess[k];return "<tr><td>"+i.name+"</td><td>"+(d>0?"+":"")+d+" "+i.unit+"</td></tr>"}).join(""):"<tr><td colspan='2' class='mute'>No receipts or order deductions yet.</td></tr>";
+  const tot=ks.reduce((s,k)=>s+Math.abs(sess[k]),0);
+  $("sSum").textContent=tot+" units across "+new Set(ks.map(k=>it(k.slice(-2)).cat)).size+" categories";
+
+}
+function renderCount(){
+  $("cBody").innerHTML=items.map(i=>"<tr data-i='"+i.id+"'><td>"+i.name+"</td><td>"+i.stock+" "+i.unit+"</td><td><input class='cn' type='number' min='0' style='width:84px' placeholder='"+i.stock+"'></td><td class='vr'>–</td><td><select class='why hide'><option value=''>Reason…</option><option>Miscount earlier</option><option>Unrecorded delivery</option><option>Unrecorded usage</option><option>Loss</option><option>Waste: Expired</option><option>Waste: Damaged</option><option>Waste: Spoiled</option><option>Waste: Prep spill</option></select></td><td><input class='mn' type='number' min='0' value='"+i.min+"' style='width:84px'></td></tr>").join("");
+}
+function renderLog(){const f=$("lf")?$("lf").value:"",L=log.filter(l=>!f||l.a.indexOf(f)===0);$("lBody").innerHTML=L.length?L.map(l=>"<tr><td>"+l.t+"</td><td>"+STAFF+"</td><td>"+l.a+"</td><td>"+l.n+"</td><td>"+(l.d>0?"+":"")+l.d+"</td><td>"+l.note+"</td></tr>").join(""):"<tr><td colspan='6' class='mute'>No movements yet.</td></tr>"}
+$("cBody").oninput=()=>document.querySelectorAll("#cBody tr").forEach(tr=>{const i=it(tr.dataset.i),v=tr.querySelector(".cn").value,w=tr.querySelector(".why");
+  if(v===""){tr.querySelector(".vr").textContent="–";w.classList.add("hide");return}
+  const d=+v-i.stock;tr.querySelector(".vr").textContent=(d>0?"+":"")+d;w.classList.toggle("hide",d===0)});
+$("cSave").onclick=()=>{
+  const rows=[...document.querySelectorAll("#cBody tr")];let bad=false;
+  rows.forEach(tr=>{const i=it(tr.dataset.i),v=tr.querySelector(".cn").value,w=tr.querySelector(".why");w.style.outline="";
+    if(v!==""&&+v!==i.stock&&!w.value){w.style.outline="3px solid var(--err)";bad=true}});
+  if(bad){$("cMsg").textContent="Choose a reason for every variance before saving.";return}
+  if(!window._arm){window._arm=1;$("cSave").textContent="Confirm: save adjustments";$("cMsg").textContent="Review the variances, then press again to confirm.";return}
+  window._arm=0;$("cSave").textContent="Save adjustments";
+  let n=0;rows.forEach(tr=>{const i=it(tr.dataset.i),v=tr.querySelector(".cn").value,m=+tr.querySelector(".mn").value;
+    if(v!==""&&+v!==i.stock){const d=+v-i.stock;i.stock=+v;stamp("Count adjust",i,d,tr.querySelector(".why").value);n++}
+    if(m!==i.min){stamp("Min updated",i,0,i.min+" → "+m);i.min=m}});
+  $("cMsg").textContent=n+" adjustment(s) saved.";toast("Count saved");renderAll();renderCount();
+};
+
+$("bell").onclick=()=>{const l=items.filter(i=>i.stock<=i.min);toast(l.length?"Low stock: "+l.map(i=>i.name).join(", "):"No low-stock items")};
+
+const T={in:["Barcode receiving","Scan package"],out:["Stock out","Stock out"],waste:["Waste log","Waste log"],count:["Physical count","Physical count"],log:["Stock movement","History"],inv:["Inventory","Inventory"]};
+$("tabs").onclick=e=>{const b=e.target.closest("button");if(!b)return;
+  mode=b.dataset.t;stopCam();cur=null;$("pkg").classList.add("hide");msg("","Waiting for a barcode. Stock changes only after you confirm.");
+  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  $("scanView").classList.toggle("hide",mode!=="in");
+  $("stockGrid").classList.toggle("hide",mode!=="in"&&mode!=="out");
+  ["inv","waste","count","log"].forEach(v=>$(v+"View").classList.toggle("hide",mode!==v));
+  $("title").textContent=T[mode][0];$("crumb").textContent=T[mode][1];$("scanTitle").textContent=mode==="out"?"Scan package to remove":"Scan package";
+  if(mode==="out")$("sample").dataset.m="out";
+};
+/* orders auto-deduct ingredients */
+const menu=[
+{n:"Chicken adobo",p:220,r:{CH:0.3,RI:0.2}},
+{n:"Fried chicken",p:240,r:{CH:0.35,OI:0.1,RI:0.2}},
+{n:"Garlic rice",p:60,r:{RI:0.25,OI:0.02}},
+{n:"Tomato salad",p:90,r:{TO:0.2,OI:0.01}}];
+const orders=[];let oNo=1000;
+const r2=n=>Math.round(n*100)/100;
+const maxQty=m=>Math.floor(Math.min(...Object.entries(m.r).map(([k,v])=>it(k).stock/v)));
+function renderMenu(){
+  if(!$("menuBody"))return;
+  $("menuBody").innerHTML=menu.map((m,x)=>{const mx=maxQty(m);
+    return "<tr><td>"+m.n+"</td><td>₱"+m.p+"</td><td>"+Object.entries(m.r).map(([k,v])=>v+" "+it(k).unit+" "+it(k).name.toLowerCase()).join(", ")+"</td><td><span class='badge "+(mx>0?"b-ok":"b-low")+"'>"+(mx>0?mx+" servings":"Out of stock")+"</span></td><td><input id='mq"+x+"' type='number' min='1' value='1' style='width:70px' aria-label='Quantity'></td><td><button class='btn red' data-m='"+x+"'"+(mx>0?"":" disabled")+">Place order</button></td></tr>"}).join("");
+  $("ordBody").innerHTML=orders.length?orders.map(o=>"<tr><td>#"+o.no+"</td><td>"+o.q+" × "+o.n+"</td><td>₱"+o.t+"</td><td><span class='badge b-w'>Pending</span></td></tr>").join(""):"<tr><td colspan='4' class='mute'>No orders yet.</td></tr>";
+}
+if($("menuBody"))$("menuBody").onclick=e=>{const b=e.target.closest("button[data-m]");if(!b)return;
+  const m=menu[+b.dataset.m],q=Math.max(1,Math.floor(+$("mq"+b.dataset.m).value||1));
+  if(q>maxQty(m)){toast("Not enough ingredients. Max "+maxQty(m)+" servings");return}
+  const no=++oNo;
+  Object.entries(m.r).forEach(([k,v])=>{const i=it(k),d=-r2(v*q);i.stock=r2(i.stock+d);sess["out"+i.id]=r2((sess["out"+i.id]||0)+d);stamp("Order #"+no,i,d,q+" × "+m.n)});
+  orders.unshift({no,n:m.n,q,t:m.p*q});toast("Order #"+no+" placed. Ingredients deducted.");renderAll();
+};
+const stat=i=>i.stock<=0?"Out":i.stock<=i.min?"Low":"OK";
+const expIn=i=>Math.ceil((new Date(i.exp)-Date.now())/864e5);
+const bcOf=i=>(pkgs.find(p=>p.item===i.id)||{}).code||"";
+$("ic").innerHTML="<option value=''>All categories</option>"+[...new Set(items.map(i=>i.cat))].map(c=>"<option>"+c+"</option>").join("");
+function renderInv(){
+  const q=$("iq").value.toLowerCase(),c=$("ic").value,s=$("is").value;
+  const low=items.filter(i=>stat(i)=="Low"),out=items.filter(i=>stat(i)=="Out"),ex=items.filter(i=>expIn(i)<=7);
+  const val=items.reduce((t,i)=>t+i.stock*i.cost,0);
+  $("ov").innerHTML=[["Ingredients",items.length],["Low stock",low.length],["Out of stock",out.length],["Expiring in 7 days",ex.length],["Stock value","\u20b1"+Math.round(val).toLocaleString()]].map(a=>"<div class='ov'><b>"+a[1]+"</b>"+a[0]+"</div>").join("");
+  let al="";
+  items.forEach(i=>{const d=dl(i);
+    if(stat(i)=="Out")al+="<div class='c'>&#9888; Critical: "+i.name+" is out of stock</div>";
+    else if(stat(i)=="Low"){al+="<div class='"+(d<2?"c":"w")+"'>&#9888; "+(d<2?"Critical: ":"")+i.name+" is below its minimum ("+i.stock+" of "+i.min+" "+i.unit+")</div>";
+      const need=Math.max(i.min,i.vel*7)-i.stock;al+="<div class='i'>Restock: order about "+Math.ceil(need)+" "+i.unit+" of "+i.name+" to cover 7 days</div>"}
+    if(expIn(i)<=7)al+="<div class='w'>Expiring: "+i.name+" in "+expIn(i)+" days ("+i.exp+")</div>"});
+  $("al").innerHTML=al||"<div class='i'>No alerts. All stock is above its minimum.</div>";
+  const rows=items.filter(i=>(!q||(i.name+" "+bcOf(i)).toLowerCase().includes(q))&&(!c||i.cat==c)&&(!s||stat(i)==s));
+  $("invBody").innerHTML=rows.length?rows.map(i=>"<tr><td>"+i.name+"</td><td>"+i.cat+"</td><td>"+bcOf(i)+"</td><td>"+i.stock+" "+i.unit+"</td><td>"+i.min+"</td><td>+"+i.def+" "+i.unit+"</td><td>"+i.sup+"</td><td>"+i.exp+"</td><td>\u20b1"+Math.round(i.stock*i.cost).toLocaleString()+"</td><td><span class='badge "+(stat(i)=="OK"?"b-ok":"b-low")+"'>"+(stat(i)=="OK"?"OK":"&#9888; "+stat(i))+"</span></td></tr>").join(""):"<tr><td colspan='10' class='mute'>No ingredients match.</td></tr>";
+  const ws={};log.filter(l=>l.a=="Count adjust"&&l.note.indexOf("Waste: ")==0).forEach(l=>{const k=l.note.slice(7);ws[k]=(ws[k]||0)+Math.abs(l.d)});
+  $("wsBody").innerHTML=Object.keys(ws).length?Object.keys(ws).map(k=>"<tr><td>"+k+"</td><td>"+r2(ws[k])+" units</td></tr>").join(""):"<tr><td colspan='2' class='mute'>No waste logged.</td></tr>";
+}
+["iq","ic","is"].forEach(x=>$(x).addEventListener("input",renderInv));
+$("lf").onchange=renderLog;
+$("lPrint").onclick=()=>window.print();
+$("lCsv").onclick=()=>{const t="time,staff,action,item,change,note\n"+log.map(l=>[l.t,STAFF,l.a,l.n,l.d,l.note].join(",")).join("\n");
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("CSV copied"),()=>toast("Couldn't copy CSV"))};
+const _ra=renderAll;renderAll=function(){_ra();renderMenu();renderInv()};
+renderAll();renderCount();renderLog();
+</script></body></html>

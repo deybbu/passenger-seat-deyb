@@ -67,16 +67,17 @@ class ModuleController extends Controller
         $validated = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
             'quantity' => ['required', 'numeric', 'min:0.001', 'max:999999'],
-            'notes' => ['nullable', 'string', 'max:200'],
+            'reason' => ['required', Rule::in(['Pre-Cook Spoilage', 'Over-Prep Waste', 'Boodle Return', 'Other'])],
+            'notes' => ['required', 'string', 'max:500'],
         ]);
 
         try {
-            $inventory->logMovement(
+            $inventory->recordWaste(
                 Ingredient::findOrFail($validated['ingredient_id']),
-                'waste',
                 (float) $validated['quantity'],
+                $validated['reason'],
+                trim($validated['notes']),
                 $request->user(),
-                $validated['notes'] ?? 'Food waste',
             );
         } catch (\DomainException $exception) {
             return back()->with('error', $exception->getMessage());
@@ -156,10 +157,11 @@ class ModuleController extends Controller
         }
 
         $lowStock = Ingredient::query()
-            ->where('manual_override', false)
-            ->whereColumn('current_stock', '<=', 'min_threshold')
-            ->orderBy('current_stock')
-            ->get();
+            ->withUsableStock()
+            ->get()
+            ->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock())
+            ->sortBy(fn (Ingredient $ingredient): float => $ingredient->usableStock())
+            ->values();
 
         return view('admin.forecasting', compact('daily', 'forecast', 'avgOrders', 'avgSales', 'lowStock'));
     }

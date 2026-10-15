@@ -7,13 +7,10 @@
     <link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}">
     <title>@yield('title', 'Passenger Seat Restaurant') | Passenger Seat</title>
     <meta name="description" content="A Filipino-inspired dining experience at Passenger Seat Restaurant.">
-    <script>
-        const savedTheme = window.localStorage.getItem('passenger-seat-theme');
-        document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
-    </script>
-    @vite(['resources/css/app.css', 'resources/css/landing.css', 'resources/js/app.js'])
+    @include('partials.theme-init')
+    @vite(['resources/css/app.css', 'resources/css/landing.css', 'resources/css/app-theme.css', 'resources/js/app.js', 'resources/js/app-theme.js'])
 </head>
-<body class="landing-site">
+<body class="landing-site app-theme-scope">
     <x-landing.navigation />
 
     <main>

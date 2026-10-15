@@ -1,24 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const themeToggle = document.querySelector('#th');
-    const setTheme = (theme) => {
-        document.documentElement.dataset.theme = theme;
-        window.localStorage.setItem('passenger-seat-qr-theme', theme);
-
-        if (themeToggle) {
-            themeToggle.textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
-            themeToggle.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
-        }
-    };
-    const savedTheme = window.localStorage.getItem('passenger-seat-qr-theme');
-
-    if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme);
-
-    themeToggle?.addEventListener('click', () => {
-        const currentTheme = document.documentElement.dataset.theme
-            ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        setTheme(currentTheme === 'dark' ? 'light' : 'dark');
-    });
-
     const root = document.querySelector('#qr-root');
 
     if (!root) return;

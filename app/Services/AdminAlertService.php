@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Ingredient;
+use App\Models\EventInquiry;
 use App\Models\Order;
 use App\Support\AdminSettings;
 use Illuminate\Http\Request;
@@ -23,10 +24,11 @@ class AdminAlertService
 
         if ($settings['low_stock_alerts'] && Schema::hasTable('ingredients')) {
             $lowStock = Ingredient::query()
-                ->where('manual_override', false)
-                ->whereColumn('current_stock', '<=', 'min_threshold')
-                ->orderBy('current_stock')
-                ->get();
+                ->withUsableStock()
+                ->get()
+                ->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock())
+                ->sortBy(fn (Ingredient $ingredient): float => $ingredient->usableStock())
+                ->values();
 
             foreach ($lowStock as $ingredient) {
                 $key = 'stock-'.$ingredient->id;
@@ -34,7 +36,7 @@ class AdminAlertService
                     'key' => $key,
                     'type' => 'stock',
                     'title' => 'Low stock',
-                    'body' => $ingredient->name.' is at '.$this->qty($ingredient->current_stock).' '.$ingredient->unit.' (min '.$this->qty($ingredient->min_threshold).' '.$ingredient->unit.').',
+                    'body' => $ingredient->name.' has '.$this->qty($ingredient->usableStock()).' usable '.$ingredient->unit.' (par '.$this->qty($ingredient->min_threshold).' '.$ingredient->unit.').',
                     'href' => route('admin.inventory'),
                     'time' => optional($ingredient->updated_at)?->diffForHumans() ?? 'Just now',
                     'unread' => ! $read->contains($key),
@@ -58,6 +60,29 @@ class AdminAlertService
                     'body' => $order->reference_number.' is '.ucfirst($order->status).'.',
                     'href' => route('admin.orders', ['status' => $order->status]),
                     'time' => optional($order->created_at)?->diffForHumans() ?? 'Just now',
+                    'unread' => ! $read->contains($key),
+                ]);
+            }
+        }
+
+        if (Schema::hasTable('event_inquiries')) {
+            $inquiries = EventInquiry::query()
+                ->where('status', EventInquiry::STATUS_PENDING)
+                ->latest()
+                ->limit(12)
+                ->get();
+
+            foreach ($inquiries as $inquiry) {
+                $key = 'event-inquiry-'.$inquiry->id;
+                $alerts->push([
+                    'key' => $key,
+                    'type' => 'event',
+                    'title' => 'New event inquiry',
+                    'body' => $inquiry->reference.' from '.$inquiry->first_name.' '.$inquiry->last_name
+                        .' requests '.$inquiry->event_type.' for '.$inquiry->event_date->toFormattedDateString()
+                        .' ('.$inquiry->guest_count.' guests). Contact: '.$inquiry->email.', '.$inquiry->mobile_number.'.',
+                    'href' => route('admin.notifications'),
+                    'time' => optional($inquiry->created_at)?->diffForHumans() ?? 'Just now',
                     'unread' => ! $read->contains($key),
                 ]);
             }

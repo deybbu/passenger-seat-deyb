@@ -6,7 +6,8 @@
     <link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}">
     <title>{{ trim($__env->yieldContent('title', 'Kitchen')) }} | Passenger Seat Restaurant</title>
     <meta name="robots" content="noindex,nofollow">
-    @vite(['resources/css/kitchen.css', 'resources/js/kitchen.js'])
+    @include('partials.theme-init')
+    @vite(['resources/css/kitchen.css', 'resources/css/app-theme.css', 'resources/js/kitchen.js', 'resources/js/app-theme.js'])
 </head>
 <body>
     @php($user = auth()->user())
@@ -27,9 +28,7 @@
                 </button>
             </nav>
             <time class="clk" data-kitchen-clock></time>
-            <button class="btn ic" type="button" data-kitchen-theme aria-label="Toggle theme">
-                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-            </button>
+            <x-theme-toggle class="btn ic" />
             <div class="me">
                 <div class="av" aria-hidden="true">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($user->name, 0, 2)) }}</div>
                 <span><b>{{ $user->name }}</b></span>
@@ -43,7 +42,7 @@
         </header>
         <div class="tick" data-stock-warning role="alert" @if ($lowStockCount === 0) hidden @endif>
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-            <span data-stock-warning-text>Warning: {{ $ingredients->filter(fn ($ingredient) => $ingredient->isLowStock())->map(fn ($ingredient) => $ingredient->name.' '.((float) $ingredient->current_stock <= 0 ? 'out of stock' : 'running low').' ('.$ingredient->current_stock.' '.$ingredient->unit.', min '.$ingredient->min_threshold.' '.$ingredient->unit.')')->join(' · ') }}</span>
+            <span data-stock-warning-text>Warning: {{ $ingredients->filter(fn ($ingredient) => $ingredient->isLowStock())->map(fn ($ingredient) => $ingredient->name.' '.($ingredient->usableStock() <= 0 ? 'out of stock' : 'running low').' ('.$ingredient->usableStock().' usable '.$ingredient->unit.', min '.$ingredient->min_threshold.' '.$ingredient->unit.')')->join(' · ') }}</span>
             <button type="button" data-v="inv">Open stock</button>
         </div>
         <div class="tick" data-refresh-message role="alert" hidden></div>

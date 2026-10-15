@@ -1,24 +1,11 @@
 const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-function currentTheme() {
-    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-}
-
 function showClientStatus(message, isError = false) {
     const status = document.getElementById('adminClientStatus');
     if (!status) return;
     status.textContent = message;
     status.classList.toggle('error', isError);
     status.hidden = false;
-}
-
-function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    try {
-        localStorage.setItem('ps-admin-theme', theme);
-    } catch (error) {
-        showClientStatus('The theme changed, but this browser could not save your preference.', true);
-    }
 }
 
 function toggleSidebar(forceClose = false) {
@@ -71,10 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', () => {
         if (window.innerWidth > 768) toggleSidebar(true);
-    });
-
-    document.getElementById('adminThemeBtn')?.addEventListener('click', () => {
-        applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
     });
 
     const panel = document.getElementById('adminNotifyPanel');

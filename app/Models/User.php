@@ -34,6 +34,11 @@ class User extends Authenticatable
         return $this->hasMany(InventoryLog::class);
     }
 
+    public function receivedInventoryLots(): HasMany
+    {
+        return $this->hasMany(InventoryStockLot::class, 'received_by');
+    }
+
     public function tableSessionsOpened(): HasMany
     {
         return $this->hasMany(TableSession::class, 'opened_by');

@@ -26,8 +26,9 @@ class AppServiceProvider extends ServiceProvider
 
             if (Schema::hasTable('ingredients')) {
                 $lowStockCount = Ingredient::query()
-                    ->where('manual_override', false)
-                    ->whereColumn('current_stock', '<=', 'min_threshold')
+                    ->withUsableStock()
+                    ->get()
+                    ->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock())
                     ->count();
             }
 

@@ -6,7 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}">
     <title>@yield('title', 'Passenger Seat Restaurant') · Passenger Seat</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.theme-init')
+    @vite(['resources/css/app.css', 'resources/css/app-theme.css', 'resources/js/app.js', 'resources/js/app-theme.js'])
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
     <header class="border-b border-red-100 bg-white">
@@ -23,6 +24,7 @@
                 <a href="{{ route('cart.show') }}" class="rounded-lg bg-red-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
                     Cart <span class="ml-1 rounded-full bg-white/20 px-2 py-0.5">{{ collect(session('cart', []))->sum() }}</span>
                 </a>
+                <x-theme-toggle class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" />
             </nav>
         </div>
     </header>

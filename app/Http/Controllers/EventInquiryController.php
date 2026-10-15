@@ -117,7 +117,7 @@ class EventInquiryController extends Controller
         }
 
         return redirect()
-            ->route('events')
+            ->to(route('home').'#reserve')
             ->with('event_inquiry', [
                 'reference' => $inquiry->reference,
                 'event_date' => $inquiry->event_date->toDateString(),

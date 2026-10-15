@@ -101,6 +101,15 @@ Route::middleware(['auth', 'role:inventory'])
         Route::get('/logs', [InventoryController::class, 'logs'])->name('inventory.logs');
         Route::post('/', [InventoryController::class, 'store'])->name('staff.inventory.store');
         Route::post('/barcode', [InventoryController::class, 'assignBarcode'])->name('staff.inventory.barcode');
+        Route::post('/preparation-recipes', [InventoryController::class, 'storePreparationRecipe'])->name('staff.inventory.preparation-recipes.store');
+        Route::post('/prepare', [InventoryController::class, 'recordPreparation'])->name('staff.inventory.prepare');
+        Route::post('/waste', [InventoryController::class, 'recordWaste'])->name('staff.inventory.waste');
+        Route::patch('/ingredients/{ingredient}/recipe-settings', [InventoryController::class, 'updateRecipeSettings'])->name('staff.inventory.recipe-settings');
+        Route::post('/receive/fresh', [InventoryController::class, 'receiveFresh'])->name('staff.inventory.receive.fresh');
+        Route::post('/receive/lookup', [InventoryController::class, 'lookupBarcode'])->name('staff.inventory.receive.lookup');
+        Route::post('/receive/preview', [InventoryController::class, 'previewReceipt'])->name('staff.inventory.receive.preview');
+        Route::post('/receive/confirm', [InventoryController::class, 'confirmReceipt'])->name('staff.inventory.receive.confirm');
+        Route::post('/packages', [InventoryController::class, 'registerPackage'])->name('staff.inventory.packages.store');
         Route::patch('/{ingredient}', [InventoryController::class, 'update'])->name('staff.inventory.update');
         Route::post('/{ingredient}/logs', [InventoryController::class, 'log'])->name('staff.inventory.log');
         Route::delete('/{ingredient}', [InventoryController::class, 'destroy'])->name('staff.inventory.destroy');

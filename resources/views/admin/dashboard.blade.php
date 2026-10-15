@@ -136,7 +136,7 @@
             @if($lowStockItems->isNotEmpty())
                 @foreach($lowStockItems as $item)
                     @php
-                        $cur = (float) $item->current_stock;
+                        $cur = $item->usableStock();
                         $min = (float) $item->min_threshold;
                         $pct = $min > 0 ? min(100, max(5, round(($cur / $min) * 100))) : 50;
                     @endphp

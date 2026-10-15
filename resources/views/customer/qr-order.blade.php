@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Table {{ $tableNumber ?: 'QR' }} · Passenger Seat</title>
+    @include('partials.theme-init')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
-    @vite(['resources/css/qr-order.css', 'resources/js/qr-order.js'])
+    @vite(['resources/css/qr-order.css', 'resources/css/app-theme.css', 'resources/js/qr-order.js', 'resources/js/app-theme.js'])
 </head>
 <body class="qr-body">
     <main class="app" id="app">
         <div class="demo">
             <span>Appearance</span>
-            <button id="th" type="button" aria-label="Toggle dark mode">Dark mode</button>
+            <x-theme-toggle />
         </div>
         @if ($invalidTable)
             <div class="center">

@@ -20,7 +20,7 @@
             </nav>
             <div class="pos-header-actions">
                 <time data-pos-clock></time>
-                <button type="button" class="pos-theme-toggle" data-pos-theme aria-label="Switch to dark mode">Dark mode</button>
+                <x-theme-toggle class="pos-theme-toggle" />
                 <form method="POST" action="{{ route('staff.logout') }}">
                     @csrf
                     <button type="submit" class="pos-sign-out">Sign out</button>

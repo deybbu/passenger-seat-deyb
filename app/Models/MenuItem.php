@@ -52,10 +52,8 @@ class MenuItem extends Model
             : collect();
         $needsAggregate = ! $this->relationLoaded('ingredients')
             || $ingredients->contains(
-                fn (Ingredient $ingredient): bool => ! array_key_exists(
-                    'reserved_quantity',
-                    $ingredient->getAttributes(),
-                )
+                fn (Ingredient $ingredient): bool => ! array_key_exists('reserved_quantity', $ingredient->getAttributes())
+                    || ! array_key_exists('usable_stock', $ingredient->getAttributes())
             );
 
         if ($needsAggregate) {
@@ -64,10 +62,13 @@ class MenuItem extends Model
         }
 
         return $ingredients->every(
-            fn (Ingredient $ingredient): bool => (float) $ingredient->current_stock
+            fn (Ingredient $ingredient): bool => min(
+                (float) $ingredient->current_stock,
+                (float) ($ingredient->usable_stock ?? 0),
+            )
                 - (float) ($ingredient->reserved_quantity ?? 0)
                 + self::STOCK_EPSILON
-                >= (float) $ingredient->pivot->quantity
+                >= $ingredient->rawQuantityForPortion((float) $ingredient->pivot->quantity)
         );
     }
 
@@ -79,10 +80,12 @@ class MenuItem extends Model
     private static function stockAvailabilityRelations(): array
     {
         return [
-            'ingredients' => static fn ($query) => $query->withSum([
-                'orderReservations as reserved_quantity' => static fn ($reservations) => $reservations
-                    ->where('status', 'reserved'),
-            ], 'quantity'),
+            'ingredients' => static fn ($query) => $query
+                ->withSum([
+                    'orderReservations as reserved_quantity' => static fn ($reservations) => $reservations
+                        ->where('status', 'reserved'),
+                ], 'quantity')
+                ->withUsableStock(),
         ];
     }
 }

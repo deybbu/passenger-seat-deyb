@@ -29,7 +29,7 @@
                 <thead><tr><th>Ingredient</th><th>Current stock</th><th>Minimum</th></tr></thead>
                 <tbody>
                     @forelse($lowStock as $ingredient)
-                        <tr><td class="admin-strong">{{ $ingredient->name }}</td><td>{{ $ingredient->current_stock }} {{ $ingredient->unit }}</td><td>{{ $ingredient->min_threshold }} {{ $ingredient->unit }}</td></tr>
+                        <tr><td class="admin-strong">{{ $ingredient->name }}</td><td>{{ number_format($ingredient->usableStock(), 3) }} {{ $ingredient->unit }} usable</td><td>{{ $ingredient->min_threshold }} {{ $ingredient->unit }}</td></tr>
                     @empty
                         <tr><td colspan="3" class="admin-muted">No low-stock ingredients.</td></tr>
                     @endforelse

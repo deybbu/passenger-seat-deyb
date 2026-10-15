@@ -224,6 +224,7 @@
     </style>
 </head>
 <body class="staff-login-page">
+    <x-theme-toggle class="staff-login-theme-toggle" />
     <main class="staff-login-shell">
         <section class="staff-login-card" aria-labelledby="staff-login-title">
             <div class="staff-login-visual">

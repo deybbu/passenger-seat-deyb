@@ -52,6 +52,7 @@ class KitchenController extends Controller
     private function inventoryData(): array
     {
         $ingredients = Ingredient::query()
+            ->withUsableStock()
             ->withSum([
                 'orderReservations as reserved_quantity' => fn ($query) => $query->where('status', 'reserved'),
             ], 'quantity')

@@ -16,22 +16,26 @@
             <a href="{{ url('/story#experience') }}">Experience</a>
             <a href="{{ url('/events') }}">Events</a>
             <a href="#visit">Contact</a>
-            <button
-                class="landing-theme-toggle"
-                type="button"
-                data-theme-toggle
-                aria-label="Switch to dark mode"
-                aria-pressed="false"
-            >
-                <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>
-                </svg>
-                <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="12" cy="12" r="4"/>
-                    <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>
-                </svg>
-                <span data-theme-label>Dark mode</span>
-            </button>
+            @if (request()->routeIs('home'))
+                <button
+                    class="landing-theme-toggle"
+                    type="button"
+                    data-theme-toggle
+                    aria-label="Switch to dark mode"
+                    aria-pressed="false"
+                >
+                    <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>
+                    </svg>
+                    <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>
+                    </svg>
+                    <span data-theme-label>Dark mode</span>
+                </button>
+            @else
+                <x-theme-toggle class="landing-theme-toggle" />
+            @endif
             <a class="landing-button landing-button-primary landing-nav-cta" href="{{ url('/menu') }}">Explore Menu <span aria-hidden="true">↗</span></a>
         </div>
     </nav>

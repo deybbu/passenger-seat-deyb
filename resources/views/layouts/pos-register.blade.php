@@ -6,7 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Passenger Seat POS')</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    @vite(['resources/css/pos-register.css', 'resources/js/pos-shell.js'])
+    @include('partials.theme-init')
+    @vite(['resources/css/pos-register.css', 'resources/css/app-theme.css', 'resources/js/pos-shell.js', 'resources/js/app-theme.js'])
 </head>
 <body>
     @php($activePosTab = trim($__env->yieldContent('pos-tab', 'register')))
@@ -21,7 +22,7 @@
         </nav>
         <div class="top-actions">
             <time class="clock" id="clock"></time>
-            <button class="btn sm" id="theme" type="button">Dark mode</button>
+            <x-theme-toggle class="btn sm" />
             <form method="POST" action="{{ route('staff.logout') }}">
                 @csrf
                 <button class="btn sm sign-out" type="submit">Sign out</button>

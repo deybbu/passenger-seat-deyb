@@ -35,10 +35,14 @@
                         <td class="px-4 py-3 font-semibold">{{ $log->ingredient->name }}</td>
                         <td class="px-4 py-3 capitalize">{{ str_replace('_', ' ', $log->type) }}</td>
                         <td class="px-4 py-3 text-right font-semibold">
-                            {{ ($log->type === 'stock_out' ? '−' : ((float) $log->quantity > 0 && $log->type === 'adjustment' ? '+' : '')) }}{{ rtrim(rtrim(number_format((float) $log->quantity, 3, '.', ''), '0'), '.') }} {{ $log->ingredient->unit }}
+                            @php
+                                $isDecrease = in_array($log->type, ['stock_out', 'prep_out', 'waste'], true)
+                                    || ($log->type === 'adjustment' && (float) $log->quantity < 0);
+                            @endphp
+                            {{ $isDecrease ? '−' : '+' }}{{ rtrim(rtrim(number_format(abs((float) $log->quantity), 3, '.', ''), '0'), '.') }} {{ $log->ingredient->unit }}
                         </td>
                         <td class="px-4 py-3">{{ $log->user?->name ?? 'Customer order' }}</td>
-                        <td class="px-4 py-3 text-gray-600">{{ $log->note }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ $log->reason ? $log->reason.' · ' : '' }}{{ $log->notes ?: $log->stockLot?->batch_number }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="px-4 py-10 text-center text-gray-500">Nothing logged yet.</td></tr>

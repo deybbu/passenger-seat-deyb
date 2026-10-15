@@ -75,10 +75,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const isPast = date < today;
             const status = isPast ? 'past' : (availability[dateKey] || 'available');
             const button = document.createElement('button');
+            const statusLabel = status === 'pending' || status === 'booked'
+                ? document.createElement('small')
+                : null;
 
             button.type = 'button';
-            button.className = `landing-calendar-day is-${status}`;
+            button.className = `d ${status} landing-calendar-day is-${status}`;
             button.textContent = String(day);
+
+            if (statusLabel) {
+                statusLabel.textContent = status === 'pending' ? 'Pending' : 'Booked';
+                button.append(statusLabel);
+            }
             button.setAttribute('role', 'gridcell');
             button.setAttribute('aria-label', `${new Intl.DateTimeFormat(undefined, {
                 month: 'long',

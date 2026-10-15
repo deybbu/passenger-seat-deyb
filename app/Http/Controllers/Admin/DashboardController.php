@@ -29,17 +29,14 @@ class DashboardController extends Controller
 
         $preparingOrders = Order::where('status', 'preparing')->count();
 
-        $lowStockCount = Ingredient::query()
-            ->where('manual_override', false)
-            ->whereColumn('current_stock', '<=', 'min_threshold')
-            ->count();
-
         $lowStockItems = Ingredient::query()
-            ->where('manual_override', false)
-            ->whereColumn('current_stock', '<=', 'min_threshold')
-            ->orderBy('current_stock')
-            ->limit(5)
-            ->get();
+            ->withUsableStock()
+            ->get()
+            ->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock())
+            ->sortBy(fn (Ingredient $ingredient): float => $ingredient->usableStock())
+            ->values();
+        $lowStockCount = $lowStockItems->count();
+        $lowStockItems = $lowStockItems->take(5);
 
         $recentOrders = Order::with('items')
             ->latest()

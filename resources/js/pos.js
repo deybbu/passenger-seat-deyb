@@ -126,37 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const themeButton = document.querySelector('[data-pos-theme]');
-
-    const updateThemeButton = () => {
-        if (!themeButton) return;
-
-        const isDark = document.documentElement.dataset.theme === 'dark';
-        themeButton.textContent = `${isDark ? 'Light' : 'Dark'} mode`;
-        themeButton.setAttribute('aria-label', `Switch to ${isDark ? 'light' : 'dark'} mode`);
-    };
-
-    const savedTheme = window.localStorage.getItem('passenger-seat-theme');
-
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-        document.documentElement.dataset.theme = savedTheme;
-    } else if (themeButton) {
-        document.documentElement.dataset.theme = window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark'
-            : 'light';
-    }
-
-    themeButton?.addEventListener('click', () => {
-        document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark'
-            ? 'light'
-            : 'dark';
-        window.localStorage.setItem('passenger-seat-theme', document.documentElement.dataset.theme);
-        updateThemeButton();
-    });
-
     document.querySelector('[data-print-receipt]')?.addEventListener('click', () => window.print());
 
     updateClock();
-    updateThemeButton();
     window.setInterval(updateClock, 1000);
 });

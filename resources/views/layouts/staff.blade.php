@@ -7,7 +7,9 @@
 <body class="min-h-screen bg-gray-100 font-sans text-gray-900 antialiased">
     @php
         $user = auth()->user();
-        $lowStockCount = $user->hasRole('inventory') ? \App\Models\Ingredient::where('manual_override', false)->whereColumn('current_stock', '<=', 'min_threshold')->count() : 0;
+        $lowStockCount = $user->hasRole('inventory')
+            ? \App\Models\Ingredient::withUsableStock()->get()->filter(fn ($ingredient) => $ingredient->isLowStock())->count()
+            : 0;
         $links = [
             ['Orders', 'staff.orders.index', 'staff/orders', $user->hasRole('kitchen', 'cashier')],
             ['Walk-in order', 'staff.orders.create', 'staff/orders/new', $user->hasRole('kitchen', 'cashier')],
@@ -45,6 +47,7 @@
 
             <div class="flex items-center gap-3 text-sm">
                 <span class="text-gray-600">{{ $user->name }} <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold capitalize">{{ $user->role }}</span></span>
+                <x-theme-toggle class="rounded-full border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 hover:bg-gray-50" />
                 <form method="POST" action="{{ route('staff.logout') }}">
                     @csrf
                     <button type="submit" class="rounded-full border border-gray-300 px-3 py-1.5 font-semibold hover:bg-gray-50">Sign out</button>
