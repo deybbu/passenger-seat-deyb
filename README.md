@@ -1,7 +1,10 @@
-# Passenger Seat Restaurant — Laravel 12 implementation pack
+# Passenger Seat Restaurant — Laravel 12
 
-This is a code pack to merge into an existing Laravel 12 project, not a complete Laravel installation.
+This repository contains the Passenger Seat restaurant application, built on Laravel 12.
 It includes migrations, models, role middleware, routes, controllers, seed data, and Blade views for the core workflows.
+
+See [docs/PROJECT-STRUCTURE.md](docs/PROJECT-STRUCTURE.md) for where the application
+code, views, assets, database files, and generated dependencies live.
 
 ## Requirements
 - PHP 8.2+
@@ -9,8 +12,9 @@ It includes migrations, models, role middleware, routes, controllers, seed data,
 - PostgreSQL (including Supabase PostgreSQL) or another Laravel-supported relational database
 - Node.js/npm for the existing Vite/Tailwind frontend
 
-## Install / merge
-1. Copy the `app`, `database`, `resources`, and `routes` folders into your Laravel project, merging files carefully.
+## Merge into another Laravel app
+The following steps describe how to integrate this project's application files into a separate Laravel 12 installation.
+1. Copy the `app`, `database`, `resources`, and `routes` folders into that Laravel project, merging files carefully.
 2. Configure `.env` database values and run `php artisan key:generate`.
 3. Install Laravel's official authentication starter kit (Breeze Blade is a practical option) and ensure the `auth` routes/views exist. This pack deliberately does not invent a custom password-reset/registration system.
 4. Check `bootstrap/app.php` if you want to register middleware aliases. The routes below use Laravel's built-in `can` middleware and a `role` alias; register it as described below.

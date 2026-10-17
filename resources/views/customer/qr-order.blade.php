@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @include('partials.favicon')
     <title>Table {{ $tableNumber ?: 'QR' }} · Passenger Seat</title>
     @include('partials.theme-init')
     <link rel="preconnect" href="https://fonts.googleapis.com">

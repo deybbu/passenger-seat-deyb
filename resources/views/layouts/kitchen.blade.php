@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}">
+    @include('partials.favicon')
     <title>{{ trim($__env->yieldContent('title', 'Kitchen')) }} | Passenger Seat Restaurant</title>
     <meta name="robots" content="noindex,nofollow">
     @include('partials.theme-init')

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}"><title>Kitchen Order Board</title>@include('partials.theme-init')@vite(['resources/css/app.css','resources/css/app-theme.css','resources/js/app.js','resources/js/app-theme.js'])</head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">@include('partials.favicon')<title>Kitchen Order Board</title>@include('partials.theme-init')@vite(['resources/css/app.css','resources/css/app-theme.css','resources/js/app.js','resources/js/app-theme.js'])</head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
 <header class="bg-red-800 text-white"><div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-5"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-red-100">Passenger Seat · Staff</p><h1 class="text-2xl font-black">Order board</h1></div><nav class="flex items-center gap-4"><x-theme-toggle class="rounded-lg border border-white/50 px-3 py-2 text-sm font-bold text-white" /><a class="font-bold underline" href="{{ route('menu.index') }}">Public menu</a></nav></div></header>
 <main class="mx-auto max-w-7xl px-4 py-8">

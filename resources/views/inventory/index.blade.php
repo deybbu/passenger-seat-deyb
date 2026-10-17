@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex,nofollow">
+    @include('partials.favicon')
     <title>Passenger Seat · Kitchen Inventory</title>
     @include('partials.theme-init')
     @vite(['resources/css/app-theme.css', 'resources/js/app-theme.js', 'resources/js/inventory-scanner.js'])

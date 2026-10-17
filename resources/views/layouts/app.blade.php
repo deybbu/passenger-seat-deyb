@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" type="image/png" href="{{ asset('images/passenger seat favicon.png') }}">
+    @include('partials.favicon')
     <title>@yield('title', 'Passenger Seat Restaurant') | Passenger Seat</title>
     <meta name="description" content="A Filipino-inspired dining experience at Passenger Seat Restaurant.">
     @include('partials.theme-init')

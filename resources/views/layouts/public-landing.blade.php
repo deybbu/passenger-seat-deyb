@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="Passenger Seat is an airplane-themed restaurant on the 3rd Floor of SM City San Mateo, Rizal. Boodle fights, private events and reservations. Open daily 10 AM to 9 PM.">
+    @include('partials.favicon')
     <title>@yield('title', 'Passenger Seat Restaurant')</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

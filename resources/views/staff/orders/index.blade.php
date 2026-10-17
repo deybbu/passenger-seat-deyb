@@ -13,9 +13,7 @@
         </a>
     </div>
 
-    <div x-data="liveBoard()">
-        <div x-ref="board">
-            @include('staff.orders._board')
-        </div>
+    <div data-react-root="order-board">
+        @include('staff.orders._board')
     </div>
 @endsection

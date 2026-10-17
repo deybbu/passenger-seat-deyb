@@ -70,63 +70,21 @@
 
             {{-- Checkout --}}
             @php $type = old('type', session()->has('table_number') ? 'dine_in' : ''); @endphp
-            <form method="POST" action="{{ route('order.store') }}" class="pass p-4 lg:col-span-2" x-data="{ type: @js($type) }">
+            <form method="POST" action="{{ route('order.store') }}" class="pass p-4 lg:col-span-2">
                 @csrf
-                <h2 class="font-display text-2xl font-bold uppercase">Check in</h2>
-
-                <fieldset class="mt-3">
-                    <legend class="mb-2 text-sm font-semibold">How will you enjoy your order?</legend>
-                    <div class="grid grid-cols-2 gap-2">
-                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold"
-                               :class="type === 'dine_in' ? 'border-brand-600 bg-brand-50' : 'border-gray-200'">
-                            <input type="radio" name="type" value="dine_in" x-model="type" class="accent-brand-600" required> Dine-in
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold"
-                               :class="type === 'take_out' ? 'border-brand-600 bg-brand-50' : 'border-gray-200'">
-                            <input type="radio" name="type" value="take_out" x-model="type" class="accent-brand-600" required> Take-out
-                        </label>
-                    </div>
-                </fieldset>
-
-                <div class="mt-4" x-show="type === 'dine_in'" x-cloak>
-                    <label for="table_number" class="mb-1 block text-sm font-semibold">Table number</label>
-                    <input id="table_number" name="table_number" type="text" maxlength="10" :required="type === 'dine_in'"
-                           value="{{ old('table_number', session('table_number')) }}"
-                           class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
+                <div data-react-root="cart-checkout">
+                    <script type="application/json" data-props>
+                        @json([
+                            'type' => $type,
+                            'tableNumber' => old('table_number', session('table_number')),
+                            'customerName' => old('customer_name'),
+                            'customerPhone' => old('customer_phone'),
+                            'specialInstructions' => old('special_instructions'),
+                            'hasUnavailable' => $hasUnavailable,
+                            'total' => (float) $total,
+                        ])
+                    </script>
                 </div>
-
-                <div class="mt-4">
-                    <label for="customer_name" class="mb-1 block text-sm font-semibold">Your name</label>
-                    <input id="customer_name" name="customer_name" type="text" maxlength="60" required autocomplete="name"
-                           value="{{ old('customer_name') }}"
-                           class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
-                </div>
-
-                <div class="mt-4">
-                    <label for="customer_phone" class="mb-1 block text-sm font-semibold">
-                        Mobile number <span class="font-normal text-gray-500" x-text="type === 'take_out' ? '(required for take-out)' : '(optional)'"></span>
-                    </label>
-                    <input id="customer_phone" name="customer_phone" type="tel" maxlength="20" autocomplete="tel" :required="type === 'take_out'"
-                           value="{{ old('customer_phone') }}"
-                           class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
-                </div>
-
-                <div class="mt-4">
-                    <label for="special_instructions" class="mb-1 block text-sm font-semibold">Special instructions</label>
-                    <textarea id="special_instructions" name="special_instructions" rows="3" maxlength="500"
-                              placeholder="Allergies, no onions, extra spicy..."
-                              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-600 focus:ring-2 focus:ring-brand-100">{{ old('special_instructions') }}</textarea>
-                </div>
-
-                @if ($hasUnavailable)
-                    <p class="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">Remove the sold-out items to place your order.</p>
-                @endif
-
-                <button type="submit" @disabled($hasUnavailable)
-                        class="mt-5 w-full rounded-full bg-brand-600 px-6 py-3 text-base font-bold text-white hover:bg-brand-700 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-50">
-                    Place order · ₱{{ number_format($total, 2) }}
-                </button>
-                <p class="mt-2 text-center text-xs text-gray-500">You will pay at the counter.</p>
             </form>
         </div>
     @endif

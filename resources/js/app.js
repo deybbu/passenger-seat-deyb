@@ -1,5 +1,9 @@
 import './bootstrap';
 
+if (document.querySelector('[data-react-root]')) {
+    import('./react-islands.jsx');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.querySelector('[data-theme-toggle]');
     const themeLabel = themeToggle?.querySelector('[data-theme-label]');
