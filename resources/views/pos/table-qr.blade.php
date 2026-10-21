@@ -50,8 +50,25 @@
             <div class="cols">
                 @foreach ($tableStatuses as $tableStatus)
                     <article class="card">
-                        <strong>Table {{ $tableStatus['table_number'] }}</strong>
+                        @php
+                            $qrEnabled = $tableStatus['qr_enabled'];
+                            $needsDisableConfirmation = $tableStatus['table_status'] !== 'free'
+                                || $tableStatus['table_order_count'] > 0;
+                        @endphp
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <strong>Table {{ $tableStatus['table_number'] }}</strong>
+                            <span class="badge {{ $qrEnabled ? 'b-d' : '' }}">QR {{ $qrEnabled ? 'on' : 'off' }}</span>
+                        </div>
                         <p class="mute">{{ $tableStatus['table_status_label'] }} · {{ $tableStatus['table_order_count'] }} orders</p>
+                        <form method="POST" action="{{ route('staff.pos.table-qr.toggle', ['restaurantTable' => $tableStatus['table_number']]) }}">
+                            @csrf
+                            <button class="btn sm {{ $qrEnabled ? '' : 'red' }}" type="submit"
+                                @if ($qrEnabled && $needsDisableConfirmation)
+                                    data-confirm-disable data-table-number="{{ $tableStatus['table_number'] }}"
+                                    data-table-status="{{ $tableStatus['table_status_label'] }}"
+                                @endif
+                            >{{ $qrEnabled ? 'Disable QR' : 'Enable QR' }}</button>
+                        </form>
                     </article>
                 @endforeach
             </div>

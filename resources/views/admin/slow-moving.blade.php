@@ -1,11 +1,11 @@
 @extends('layouts.admin')
 
-@section('title', 'Slow-Moving Items')
-@section('page-title', 'Slow-Moving Items')
+@section('title', 'Menu Matrix')
+@section('page-title', 'Menu Matrix')
 
 @section('content')
     <div class="admin-card" style="margin-bottom:16px;">
-        <div class="admin-card-header"><span class="admin-card-title">Slow-Moving Items</span><span class="admin-muted">Analytics &amp; reports · rolling 120-day view</span></div>
+        <div class="admin-card-header"><span class="admin-card-title">Menu Matrix</span><span class="admin-muted">Analytics &amp; reports · rolling 120-day view</span></div>
         <p class="admin-muted">Fast-Moving: 40+ units sold. Very Slow: 1–20 units. Slow: 21–39 units. Counts reflect available system order history.</p>
     </div>
     <div class="admin-stats-row">

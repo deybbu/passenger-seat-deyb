@@ -10,6 +10,7 @@ use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\RestaurantTable;
 use App\Models\TableSession;
+use App\Services\RestaurantTableQrService;
 use App\Services\TableSessionStatusService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -29,24 +30,24 @@ class TableSessionController extends Controller
         $sessions = TableSession::query()
             ->with(['orders.items'])
             ->whereNull('closed_at')
-            ->orderBy('table_number')
             ->get();
+        $sessions = $sessions->sortBy('table_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $tables = Schema::hasTable('restaurant_tables')
-            ? RestaurantTable::query()->orderBy('table_number')->get()
+            ? RestaurantTable::query()->get()->sortBy('table_number', SORT_NATURAL | SORT_FLAG_CASE)->values()
             : collect();
         $tableStatuses = $tableSessionStatuses->forTables($tables)->values();
 
-        return view('staff.tables.index', compact('sessions', 'tableStatuses'));
+        return view('staff.tables.index', compact('sessions', 'tableStatuses', 'tables'));
     }
 
     public function posQr(TableSessionStatusService $tableSessionStatuses): View
     {
         $tableSessions = TableSession::query()
             ->whereNull('closed_at')
-            ->orderBy('table_number')
             ->get(['id', 'table_number', 'public_token']);
+        $tableSessions = $tableSessions->sortBy('table_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $tables = Schema::hasTable('restaurant_tables')
-            ? RestaurantTable::query()->orderBy('table_number')->get()
+            ? RestaurantTable::query()->get()->sortBy('table_number', SORT_NATURAL | SORT_FLAG_CASE)->values()
             : collect();
         $tableStatuses = $tableSessionStatuses->forTables($tables)->values();
 
@@ -90,32 +91,41 @@ class TableSessionController extends Controller
         ]);
     }
 
+    public function toggleQr(
+        Request $request,
+        RestaurantTable $restaurantTable,
+        RestaurantTableQrService $qr,
+    ): RedirectResponse {
+        abort_unless($request->user()->hasRole('cashier') || $request->user()->hasRole('admin'), 403);
+        if (! $qr->isGloballyEnabled()) {
+            return redirect()->route('staff.pos.table-qr')
+                ->with('error', 'Customer QR menus are globally disabled in System Settings.');
+        }
+
+        $table = $qr->toggle($restaurantTable, $request->user());
+
+        return redirect()->route('staff.pos.table-qr')->with('status', $table->is_enabled
+            ? "{$table->name} QR ordering enabled."
+            : "{$table->name} QR ordering disabled.");
+    }
+
     public function open(Request $request): RedirectResponse
     {
         abort_unless($request->user()->hasRole('cashier'), 403);
 
         $data = $request->validate([
-            'table_number' => ['required', 'string', 'max:10', 'regex:/^[A-Za-z0-9 -]+$/'],
+            'table_number' => ['required', 'string', 'max:10', 'regex:/^[A-Za-z0-9 -]+$/', 'exists:restaurant_tables,table_number'],
             'guest_count' => ['required', 'integer', 'min:1', 'max:30'],
         ]);
         $table = trim($data['table_number']);
+        $restaurantTable = RestaurantTable::query()->where('table_number', $table)->firstOrFail();
         abort_if($table === '', 422, 'Enter a table number.');
 
         try {
-            $session = DB::transaction(function () use ($request, $table, $data): TableSession {
-                if (Schema::hasTable('restaurant_tables')) {
-                    RestaurantTable::query()->firstOrCreate(
-                        ['table_number' => $table],
-                        [
-                            'name' => 'Table '.$table,
-                            'is_enabled' => true,
-                            'qr_token' => RestaurantTable::generateUniqueQrToken(),
-                        ],
-                    );
-                }
-
+            $session = DB::transaction(function () use ($request, $table, $data, $restaurantTable): TableSession {
                 return TableSession::create([
                     'table_number' => $table,
+                    'table_id' => $restaurantTable->id,
                     'public_token' => Str::random(64),
                     'active_table_number' => $table,
                     'guest_count' => $data['guest_count'],

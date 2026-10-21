@@ -322,7 +322,7 @@ $("pOk").onclick=()=>{const{sub,t,dt,tend}=renderPay(),te=pmeth=="Cash"?tend:t.t
  renderOrders();renderSales();toast("Payment received")};
 const qc={};
 function renderQr(){const sel=$("qTbl");
- if(!sel.options.length){sel.innerHTML=[...Array(12)].map((_,i)=>"<option>"+(i+1)+"</option>").join("");const p=new URLSearchParams(location.search).get("table");if(p&&+p>=1&&+p<=12)sel.value=p}
+ if(!sel.options.length){sel.innerHTML=[...Array(18)].map((_,i)=>"<option>"+(i+1)+"</option>").join("");const p=new URLSearchParams(location.search).get("table");if(p&&+p>=1&&+p<=18)sel.value=p}
  $("qMenu").innerHTML=MENU.map(m=>{const left=S.stock[m.id]-(qc[m.id]||0);return "<button class='item' data-q='"+m.id+"'"+(left<=0?" disabled":"")+"><img class='thumb' alt='' src='"+img(m)+"'><b>"+m.n+"</b><small>"+m.c+" \u00b7 "+(left<=0?"Sold out":"Available")+"</small><div class='p'>"+php(m.p)+"</div></button>"}).join("");
  const ids=Object.keys(qc);
  $("qLines").innerHTML=ids.length?ids.map(id=>{const m=mi(id),q=qc[id];return "<div class='line'><div><b>"+m.n+"</b><div class='mute'>"+php(m.p)+"</div></div><span class='q'><button data-qd='-1' data-q='"+id+"' aria-label='Remove one'>\u2212</button><b>"+q+"</b><button data-qd='1' data-q='"+id+"' aria-label='Add one'>+</button></span><b>"+php(m.p*q)+"</b></div>"}).join(""):"<p class='mute'>Tap an item to add it.</p>";

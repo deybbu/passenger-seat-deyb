@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Database\Seeders\RestaurantTableSeeder;
+use App\Models\Order;
 use App\Models\RestaurantTable;
 use App\Models\TableSession;
 use App\Models\User;
@@ -140,6 +142,11 @@ class TableQrControlTest extends TestCase
                 'restaurantTable' => $table->id,
             ], false), false);
 
+        $this->actingAs($this->admin)
+            ->get(route('admin.table-qr.download'))
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename=passenger-seat-table-qrs.zip');
+
         $this->patchJson(route('admin.api.reference.table-qr.toggle', ['restaurantTable' => $table]))
             ->assertOk()
             ->assertJsonPath('enabled', false);
@@ -225,5 +232,71 @@ class TableQrControlTest extends TestCase
             ->get(route('admin.api.reference.table-qr.image', ['restaurantTable' => $table]))
             ->assertOk()
             ->assertHeader('Content-Type', 'image/svg+xml; charset=UTF-8');
+    }
+
+    public function test_eighteen_active_tables_preserve_tokens_route_orders_and_reject_invalid_tokens(): void
+    {
+        $originalTokens = [];
+        foreach (range(1, 12) as $number) {
+            $originalTokens[(string) $number] = Str::random(64);
+            RestaurantTable::query()->create([
+                'table_number' => (string) $number,
+                'name' => 'Table '.$number,
+                'is_enabled' => true,
+                'qr_token' => $originalTokens[(string) $number],
+            ]);
+        }
+
+        $this->seed(RestaurantTableSeeder::class);
+        $this->seed(RestaurantTableSeeder::class);
+
+        $this->assertSame(18, RestaurantTable::query()->where('is_enabled', true)->count());
+        foreach ($originalTokens as $number => $token) {
+            $this->assertSame($token, RestaurantTable::query()->where('table_number', $number)->value('qr_token'));
+        }
+
+        foreach (RestaurantTable::query()->orderBy('table_number')->get() as $table) {
+            $this->get(route('customer.order.show', ['tableToken' => $table->qr_token]))
+                ->assertOk()
+                ->assertSee('Table '.$table->table_number);
+        }
+        $this->get(route('customer.order.show', ['tableToken' => Str::random(64)]))
+            ->assertOk()
+            ->assertSee("This QR code isn't valid", false);
+
+        foreach (['13', '18'] as $number) {
+            $table = RestaurantTable::query()->where('table_number', $number)->firstOrFail();
+            Order::query()->create([
+                'reference_number' => 'QR-'.$number,
+                'type' => 'dine_in',
+                'order_type' => 'dine_in',
+                'table_number' => $number,
+                'table_id' => $table->id,
+                'source' => 'table_qr',
+                'customer_name' => 'Table guest',
+                'total_amount' => 100,
+                'subtotal' => 100,
+                'total' => 100,
+                'vat_amount' => 0,
+                'status' => 'pending',
+                'payment_status' => 'unpaid',
+            ]);
+        }
+
+        $kitchen = User::query()->create([
+            'name' => 'Kitchen',
+            'email' => 'kitchen-expansion@example.test',
+            'password' => 'password',
+            'role' => 'kitchen',
+        ]);
+        $this->actingAs($kitchen)->get(route('staff.kitchen.board'))
+            ->assertOk()
+            ->assertSee('Table 13')
+            ->assertSee('Table 18');
+
+        $this->actingAs($this->admin)->getJson(route('admin.api.reference.dashboard'))
+            ->assertOk()
+            ->assertJsonFragment(['tableNo' => '13'])
+            ->assertJsonFragment(['tableNo' => '18']);
     }
 }

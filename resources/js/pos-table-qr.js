@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('submit', (event) => {
+        const form = event.target.closest('form');
+        const button = form?.querySelector('[data-confirm-disable]');
+        if (!button) return;
+
+        const table = button.dataset.tableNumber;
+        const status = button.dataset.tableStatus;
+        const hasOpenActivity = status && status !== 'Free';
+        const message = hasOpenActivity
+            ? `Table ${table} has an ${status.toLowerCase()} and may have unpaid or preparing orders. Disable QR ordering? Existing orders and bills will not be changed.`
+            : `Disable QR ordering for Table ${table}? Existing orders and bills will not be changed.`;
+        if (!window.confirm(message)) event.preventDefault();
+    });
+
     const root = document.querySelector('#qr-order-root');
     if (!root) return;
 

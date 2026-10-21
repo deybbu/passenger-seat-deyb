@@ -56,7 +56,7 @@ const KEY="ps_table_orders_v1";let S={seq:1000,orders:[],billReq:{}};
 try{const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
 if(!S.sess)S.sess={};if(!S.seeded){S.sess[5]={opened:Date.now(),guests:2,exp:Date.now()+180*60000};S.seeded=1}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-const TABLES=[...Array(12)].map((_,i)=>i+1);
+const TABLES=[...Array(18)].map((_,i)=>i+1);
 /* In production the table comes from the QR link and is checked on the server. Demo: ?table=5 or the selector above. */
 const qp=new URLSearchParams(location.search).get("table");
 let T=qp===null?5:(TABLES.includes(+qp)?+qp:null);

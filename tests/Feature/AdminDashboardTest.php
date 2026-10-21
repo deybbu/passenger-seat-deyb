@@ -36,6 +36,7 @@ class AdminDashboardTest extends TestCase
             'admin.recipes',
             'admin.waste',
             'admin.analytics',
+            'admin.menu-matrix',
             'admin.forecasting',
             'admin.reservations',
             'admin.chatbot',
@@ -49,6 +50,11 @@ class AdminDashboardTest extends TestCase
                 ->assertOk()
                 ->assertSee('id="view"', false);
         }
+
+        $this->actingAs($admin)
+            ->get(route('admin.slow-moving'))
+            ->assertMovedPermanently()
+            ->assertRedirect(route('admin.menu-matrix'));
 
         $this->actingAs($admin)
             ->getJson(route('admin.api.reference.dashboard'))
@@ -70,6 +76,7 @@ class AdminDashboardTest extends TestCase
                 'users',
                 'roles',
                 'rules',
+                'alerts',
             ]);
     }
 

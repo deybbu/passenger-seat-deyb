@@ -41,7 +41,12 @@
                 </div>
                 <div class="bar admin-register-customer">
                     <input id="tbl" name="table_number" value="{{ old('table_number') }}" placeholder="Table no."
-                           aria-label="Table number">
+                           aria-label="Table number" list="restaurant-tables">
+                    <datalist id="restaurant-tables">
+                        @foreach ($tables as $table)
+                            <option value="{{ $table->table_number }}">{{ $table->name }}</option>
+                        @endforeach
+                    </datalist>
                     <input id="cust" name="customer_name" value="{{ old('customer_name') }}"
                            placeholder="Customer name (optional)" aria-label="Customer">
                 </div>

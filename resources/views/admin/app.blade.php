@@ -7,6 +7,19 @@
     <meta name="admin-user" content="{{ $adminUser->name }}">
     <meta name="admin-role" content="{{ $adminUser->assignedRole->name ?? ucfirst($adminUser->role) }}">
     <title>Passenger Seat Admin</title>
+    <script>
+        (() => {
+            let theme = 'dark';
+            try {
+                const saved = localStorage.getItem('ps-theme');
+                theme = saved === 'light' || saved === 'dark'
+                    ? saved
+                    : 'dark';
+            } catch {}
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.style.colorScheme = theme;
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">

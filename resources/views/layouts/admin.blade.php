@@ -2,6 +2,19 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     @include('partials.head', ['title' => trim($__env->yieldContent('title', 'Admin'))])
+    <script>
+        (() => {
+            let theme = 'light';
+            try {
+                const saved = localStorage.getItem('ps-app-theme');
+                theme = saved === 'light' || saved === 'dark'
+                    ? saved
+                    : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            } catch {}
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.style.colorScheme = theme;
+        })();
+    </script>
     <meta name="robots" content="noindex,nofollow">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -177,12 +190,12 @@
                         </svg>
                         <span>Predictive forecasting</span>
                     </a>
-                    <a href="{{ route('admin.slow-moving') }}" class="admin-nav-item nav {{ $currentRoute === 'admin.slow-moving' ? 'active on' : '' }}">
+                    <a href="{{ route('admin.menu-matrix') }}" class="admin-nav-item nav {{ in_array($currentRoute, ['admin.menu-matrix', 'admin.slow-moving'], true) ? 'active on' : '' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 17 9 11 13 15 21 7"/>
                             <polyline points="15 7 21 7 21 13"/>
                         </svg>
-                        <span>Slow-Moving Items</span>
+                        <span>Menu Matrix</span>
                     </a>
                     <a href="{{ route('admin.archived') }}" class="admin-nav-item nav {{ $currentRoute === 'admin.archived' ? 'active on' : '' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

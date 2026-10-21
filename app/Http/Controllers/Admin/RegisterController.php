@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\RestaurantTable;
 use App\Services\CartService;
 use App\Services\OrderPaymentService;
 use App\Services\OrderService;
@@ -17,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -76,7 +78,9 @@ class RegisterController extends Controller
             ->get()
             ->map(fn (Order $order): array => $this->heldOrderData($order));
 
-        return view('admin.register', compact('menuItems', 'categories', 'heldOrders'));
+        $tables = RestaurantTable::query()->orderBy('table_number')->get(['table_number', 'name']);
+
+        return view('admin.register', compact('menuItems', 'categories', 'heldOrders', 'tables'));
     }
 
     public function store(
@@ -240,14 +244,19 @@ class RegisterController extends Controller
      */
     private function validateRegisterData(Request $request, bool $holding): array
     {
+        $tableRules = [
+            ...($holding ? ['nullable'] : ['required_if:type,dine_in', 'nullable']),
+            'string',
+            'max:10',
+            'regex:/^[A-Za-z0-9\-]+$/',
+        ];
+        if (Schema::hasTable('restaurant_tables') && RestaurantTable::query()->exists()) {
+            $tableRules[] = 'exists:restaurant_tables,table_number';
+        }
+
         $rules = [
             'type' => ['required', Rule::in(['dine_in', 'take_out'])],
-            'table_number' => [
-                ...($holding ? ['nullable'] : ['required_if:type,dine_in', 'nullable']),
-                'string',
-                'max:10',
-                'regex:/^[A-Za-z0-9\-]+$/',
-            ],
+            'table_number' => $tableRules,
             'customer_name' => ['nullable', 'string', 'max:60'],
             'special_instructions' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],

@@ -8,12 +8,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Ingredient;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
+use App\Models\RestaurantTable;
 use App\Services\OrderPaymentService;
 use App\Services\CartService;
 use App\Services\OrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -92,9 +94,14 @@ class WalkInOrderController extends Controller
 
     public function store(Request $request, OrderService $orders, OrderPaymentService $payments): RedirectResponse
     {
+        $tableRules = ['required_if:type,dine_in', 'nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9\-]+$/'];
+        if (Schema::hasTable('restaurant_tables') && RestaurantTable::query()->exists()) {
+            $tableRules[] = 'exists:restaurant_tables,table_number';
+        }
+
         $rules = [
             'type' => ['required', Rule::in(['dine_in', 'take_out'])],
-            'table_number' => ['required_if:type,dine_in', 'nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9\-]+$/'],
+            'table_number' => $tableRules,
             'customer_name' => ['nullable', 'string', 'max:60'],
             'customer_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s()]{7,20}$/'],
             'special_instructions' => ['nullable', 'string', 'max:500'],

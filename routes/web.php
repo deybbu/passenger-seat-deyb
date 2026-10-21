@@ -101,6 +101,7 @@ Route::middleware(['auth', 'role:cashier'])
         Route::get('/analytics', [POSController::class, 'analytics'])->name('analytics');
         Route::get('/transactions', [POSController::class, 'ledger'])->name('ledger');
         Route::get('/table-qr', [TableSessionController::class, 'posQr'])->name('table-qr');
+        Route::post('/tables/{restaurantTable:table_number}/qr-toggle', [TableSessionController::class, 'toggleQr'])->name('table-qr.toggle');
         Route::get('/table-sessions/{tableSession}/bill', [POSController::class, 'tableSessionBill'])
             ->name('table-session-bill');
         Route::post('/table-sessions/{tableSession}/paid', [POSController::class, 'markTableSessionPaid'])
@@ -150,6 +151,7 @@ Route::middleware(['auth', 'role:admin'])
     ->group(function (): void {
         Route::get('/reference', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('reference');
         Route::get('/api/reference/dashboard', [DashboardController::class, 'referenceData'])->name('api.reference.dashboard');
+        Route::get('/api/reference/analytics', [DashboardController::class, 'referenceAnalyticsData'])->name('api.reference.analytics');
         Route::post('/api/reference/menu', [ModuleController::class, 'referenceMenuStore'])->name('api.reference.menu.store');
         Route::post('/api/reference/recipe-target', [ModuleController::class, 'referenceRecipeTarget'])->name('api.reference.recipe.target');
         Route::post('/api/reference/purchase-orders/{ingredient}', [AdminInventoryController::class, 'referencePurchaseOrder'])->name('api.reference.purchase-orders.store');
@@ -192,6 +194,7 @@ Route::middleware(['auth', 'role:admin'])
         Route::get('/billing', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('billing');
         Route::get('/table-qr', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('table-qr');
         Route::get('/table-qr/print', [TableQrController::class, 'printSheet'])->name('table-qr.print');
+        Route::get('/table-qr/download', [TableQrController::class, 'downloadSheet'])->name('table-qr.download');
         Route::patch('/table-qr/{restaurantTable}/toggle', [TableQrController::class, 'toggle'])->name('table-qr.toggle');
         Route::get('/menu-management', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('menu-management');
         Route::post('/menu-management', [ModuleController::class, 'storeMenuItem'])->name('menu-management.store');
@@ -218,7 +221,8 @@ Route::middleware(['auth', 'role:admin'])
         Route::post('/waste', [AdminInventoryController::class, 'storeWaste'])->name('waste.store');
         Route::get('/analytics', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('analytics');
         Route::get('/archived', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('archived');
-        Route::get('/slow-moving', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('slow-moving');
+        Route::get('/menu-matrix', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('menu-matrix');
+        Route::get('/slow-moving', fn () => redirect()->route('admin.menu-matrix', [], 301))->name('slow-moving');
         Route::get('/forecasting', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('forecasting');
         Route::get('/reservations', fn () => view('admin.app', ['adminUser' => request()->user()]))->name('reservations');
         Route::post('/reservations', [ModuleController::class, 'storeReservation'])->name('reservations.store');

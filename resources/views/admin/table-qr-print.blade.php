@@ -9,7 +9,7 @@
         body { background: #fff; color: #222; padding: 24px; }
         .print-actions { display: flex; justify-content: space-between; margin: 0 auto 24px; max-width: 960px; }
         .qr-sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; max-width: 960px; margin: 0 auto; }
-        .qr-sheet-card { break-inside: avoid; border: 1px solid #bbb; border-radius: 8px; padding: 18px; text-align: center; }
+        .qr-sheet-card { break-inside: avoid; page-break-inside: avoid; border: 1px solid #bbb; border-radius: 8px; padding: 18px; text-align: center; }
         .qr-sheet-card img { display: block; width: min(100%, 220px); height: auto; margin: 0 auto 12px; }
         .qr-sheet-card h2 { margin: 0; font-size: 24px; }
         .qr-sheet-card p { margin: 4px 0; }
@@ -29,6 +29,7 @@
     <div class="print-actions">
         <a class="btn" href="{{ route('admin.table-qr') }}">Back to Table QR control</a>
         <button class="btn p" type="button" onclick="window.print()">Print sheet</button>
+        <a class="btn" href="{{ route('admin.table-qr.download') }}">Download all SVGs</a>
     </div>
 
     @unless ($qrUrlConfigured)

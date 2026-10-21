@@ -174,6 +174,88 @@ class CustomerTableOrderPageTest extends TestCase
             ->assertDontSee('Database meal');
     }
 
+    public function test_cashier_can_toggle_table_qr_and_admin_uses_the_same_state(): void
+    {
+        $table = $this->createEnabledTable();
+        $cashier = User::query()->create([
+            'name' => 'QR Cashier', 'email' => 'qr-cashier-toggle@example.test', 'password' => 'password', 'role' => 'cashier',
+        ]);
+
+        $this->actingAs($cashier)
+            ->post(route('staff.pos.table-qr.toggle', ['restaurantTable' => $table->table_number]))
+            ->assertRedirect(route('staff.pos.table-qr'));
+        $this->assertDatabaseHas('restaurant_tables', ['id' => $table->id, 'is_enabled' => false]);
+        $this->assertDatabaseHas('activity_logs', [
+            'user_id' => $cashier->id,
+            'module' => 'Table QR',
+            'subject_id' => $table->id,
+        ]);
+        $this->get(route('staff.pos.table-qr'))->assertOk()->assertSee('QR off')->assertSee('Enable QR');
+
+        $admin = User::query()->create([
+            'name' => 'QR Admin', 'email' => 'qr-admin-toggle@example.test', 'password' => 'password', 'role' => 'admin',
+        ]);
+        $this->actingAs($admin)
+            ->post(route('staff.pos.table-qr.toggle', ['restaurantTable' => $table->table_number]))
+            ->assertRedirect(route('staff.pos.table-qr'));
+        $this->assertDatabaseHas('restaurant_tables', ['id' => $table->id, 'is_enabled' => true]);
+    }
+
+    public function test_kitchen_and_unauthenticated_customer_cannot_toggle_table_qr(): void
+    {
+        $table = $this->createEnabledTable();
+        $url = route('staff.pos.table-qr.toggle', ['restaurantTable' => $table->table_number]);
+        $kitchen = User::query()->create([
+            'name' => 'Kitchen User', 'email' => 'qr-kitchen-toggle@example.test', 'password' => 'password', 'role' => 'kitchen',
+        ]);
+
+        $this->actingAs($kitchen)->post($url)->assertForbidden();
+        auth()->logout();
+        $this->post($url)->assertRedirect(route('staff.login'));
+        $this->assertDatabaseHas('restaurant_tables', ['id' => $table->id, 'is_enabled' => true]);
+    }
+
+    public function test_disabled_table_cannot_submit_a_customer_qr_order(): void
+    {
+        $table = $this->createEnabledTable();
+        $cashier = User::query()->create([
+            'name' => 'QR Cashier', 'email' => 'qr-cashier-disable@example.test', 'password' => 'password', 'role' => 'cashier',
+        ]);
+        $this->actingAs($cashier)->post(route('staff.pos.table-qr.toggle', [
+            'restaurantTable' => $table->table_number,
+        ]));
+
+        $this->postJson(route('customer.order.submit', ['tableToken' => $table->qr_token]), [
+            'idempotency_key' => (string) Str::uuid(),
+            'items' => [['menu_item_id' => $this->menuItem->id, 'quantity' => 1]],
+        ])->assertNotFound()->assertJsonPath('message', "This QR code isn't valid.");
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_pos_table_status_cards_are_sorted_by_natural_table_number(): void
+    {
+        foreach (['1', '10', '2'] as $number) {
+            RestaurantTable::query()->create([
+                'table_number' => $number,
+                'name' => 'Table '.$number,
+                'is_enabled' => true,
+                'qr_token' => Str::random(64),
+            ]);
+        }
+
+        $content = $this->actingAs(User::query()->create([
+            'name' => 'Sort Cashier', 'email' => 'sort-cashier@example.test', 'password' => 'password', 'role' => 'cashier',
+        ]))->get(route('staff.pos.table-qr'))->assertOk()->getContent();
+
+        $tableOne = strpos($content, '<strong>Table 1</strong>');
+        $tableTwo = strpos($content, '<strong>Table 2</strong>');
+        $tableTen = strpos($content, '<strong>Table 10</strong>');
+        $this->assertNotFalse($tableOne);
+        $this->assertNotFalse($tableTwo);
+        $this->assertNotFalse($tableTen);
+        $this->assertTrue($tableOne < $tableTwo && $tableTwo < $tableTen);
+    }
+
     public function test_customer_status_is_current_and_scoped_to_the_table_token(): void
     {
         $table = $this->createEnabledTable();

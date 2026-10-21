@@ -15,8 +15,13 @@
     @csrf
     <div>
         <label for="table-number" class="block text-sm font-bold">Table number</label>
-        <input id="table-number" name="table_number" type="text" maxlength="10" pattern="[A-Za-z0-9 -]{1,10}" required class="mt-2 w-full rounded-xl border-gray-300 focus:border-brand-600 focus:ring-brand-600" placeholder="e.g. 5 or A-03">
-        <p class="mt-1 text-xs text-gray-500">Use the exact table number encoded in its QR link.</p>
+        <select id="table-number" name="table_number" required class="mt-2 w-full rounded-xl border-gray-300 focus:border-brand-600 focus:ring-brand-600">
+            <option value="">Choose a configured table</option>
+            @foreach ($tables as $table)
+                <option value="{{ $table->table_number }}">Table {{ $table->table_number }} — {{ $table->name }}</option>
+            @endforeach
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Tables are managed from Table QR control.</p>
     </div>
     <div>
         <label for="guest-count" class="block text-sm font-bold">Number of guests</label>

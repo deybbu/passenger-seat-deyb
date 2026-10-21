@@ -57,6 +57,7 @@ class DashboardController extends Controller
                 ->map(fn (Ingredient $ingredient): array => $this->referenceIngredient($ingredient))
                 ->values(),
             'orders' => $this->referenceOrders(),
+            'analytics' => $this->referenceAnalytics((string) $request->query('range', 'DAILY')),
             'waste' => InventoryLog::query()
                 ->where('type', 'waste')
                 ->with('ingredient')
@@ -166,6 +167,32 @@ class DashboardController extends Controller
                     $log->module,
                 ])->values(),
         ]);
+    }
+
+    public function referenceAnalyticsData(Request $request): JsonResponse
+    {
+        $timezone = (string) config('app.timezone', 'Asia/Manila');
+        $today = Carbon::now($timezone)->toDateString();
+        $earliest = Carbon::now($timezone)->subDays(365)->toDateString();
+        $validated = $request->validate([
+            'from' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$earliest, 'before_or_equal:'.$today],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:'.$today],
+            'compare' => ['nullable', 'in:previous,off'],
+        ]);
+
+        $from = Carbon::createFromFormat('!Y-m-d', $validated['from'], $timezone);
+        $to = Carbon::createFromFormat('!Y-m-d', $validated['to'], $timezone);
+        $analytics = $this->referenceAnalytics('CUSTOM', $from->toDateString(), $to->toDateString());
+        $comparison = null;
+
+        if (($validated['compare'] ?? 'previous') === 'previous') {
+            $periodDays = (int) $from->diffInDays($to) + 1;
+            $previousTo = $from->copy()->subDay();
+            $previousFrom = $previousTo->copy()->subDays($periodDays - 1);
+            $comparison = $this->referenceAnalytics('CUSTOM', $previousFrom->toDateString(), $previousTo->toDateString());
+        }
+
+        return response()->json(['analytics' => $analytics, 'comparison' => $comparison]);
     }
 
     private function referenceOrders()
@@ -280,6 +307,177 @@ class DashboardController extends Controller
 
             return (float) $query->sum($totalColumn);
         })->values()->all();
+    }
+
+    /**
+     * Build every sales widget from the same paid-order set and selected period.
+     * Item revenue is allocated in cents so category and product totals reconcile
+     * exactly with the paid order totals, including discounts and tax.
+     *
+     * @return array<string, mixed>
+     */
+    private function referenceAnalytics(string $requestedRange, ?string $fromDate = null, ?string $toDate = null): array
+    {
+        $range = strtoupper($requestedRange);
+        $timezone = (string) config('app.timezone', 'Asia/Manila');
+        $now = Carbon::now($timezone);
+        $custom = $fromDate !== null && $toDate !== null;
+        $yearly = ! $custom && $range === 'YEAR';
+        $days = match ($range) {
+            'DAILY' => 1,
+            '30D' => 30,
+            'YEAR' => 365,
+            default => 7,
+        };
+        if ($custom) {
+            $periodStart = Carbon::createFromFormat('!Y-m-d', $fromDate, $timezone)->startOfDay();
+            $periodEnd = Carbon::createFromFormat('!Y-m-d', $toDate, $timezone)->endOfDay();
+            $days = (int) $periodStart->diffInDays($periodEnd) + 1;
+        } else {
+            $periodStart = $yearly
+                ? $now->copy()->startOfMonth()->subMonths(11)
+                : $now->copy()->startOfDay()->subDays($days - 1);
+            $periodEnd = $now->copy()->endOfDay();
+        }
+
+        $orders = Order::query()
+            ->notHeld()
+            ->where('payment_status', 'paid')
+            ->where('status', '!=', 'cancelled')
+            ->whereNotNull('paid_at')
+            ->whereBetween('paid_at', [$periodStart, $periodEnd])
+            ->with(['items' => fn ($query) => $query->whereNull('cancelled_at')->with('menuItem.category')])
+            ->orderBy('paid_at')
+            ->orderBy('id')
+            ->get();
+
+        $methodTotals = [
+            'cash' => ['method' => 'Cash', 'orders' => 0, 'cents' => 0],
+            'gcash' => ['method' => 'GCash', 'orders' => 0, 'cents' => 0],
+            'card' => ['method' => 'Card', 'orders' => 0, 'cents' => 0],
+        ];
+        $categoryCents = [];
+        $productTotals = [];
+        $dailyCents = [];
+        $totalCents = 0;
+        $totalUnits = 0;
+
+        if ($yearly) {
+            for ($month = 0; $month < 12; $month++) {
+                $key = $periodStart->copy()->addMonths($month)->format('Y-m');
+                $dailyCents[$key] = 0;
+            }
+        } else {
+            for ($day = 0; $day < $days; $day++) {
+                $key = $periodStart->copy()->addDays($day)->toDateString();
+                $dailyCents[$key] = 0;
+            }
+        }
+
+        foreach ($orders as $order) {
+            $cents = (int) round((float) $order->total_amount * 100);
+            $totalCents += $cents;
+            $paidAt = $order->paid_at->copy()->timezone($timezone);
+            $dateKey = $yearly ? $paidAt->format('Y-m') : $paidAt->toDateString();
+            if (array_key_exists($dateKey, $dailyCents)) {
+                $dailyCents[$dateKey] += $cents;
+            }
+
+            $methodKey = strtolower(trim((string) $order->payment_method));
+            if ($methodKey === '') {
+                $methodKey = 'not_recorded';
+            }
+            if (! isset($methodTotals[$methodKey])) {
+                $methodTotals[$methodKey] = [
+                    'method' => $methodKey === 'not_recorded' ? 'Not recorded' : ucfirst($methodKey),
+                    'orders' => 0,
+                    'cents' => 0,
+                ];
+            }
+            $methodTotals[$methodKey]['orders']++;
+            $methodTotals[$methodKey]['cents'] += $cents;
+
+            $items = $order->items;
+            $weights = $items->map(fn (OrderItem $item): int => max(
+                0,
+                (int) round((float) $item->price * (int) $item->quantity * 100),
+            ));
+            $weightTotal = $weights->sum();
+            if ($items->isEmpty() || $weightTotal <= 0) {
+                $categoryCents['Uncategorized'] = ($categoryCents['Uncategorized'] ?? 0) + $cents;
+                $productTotals['__unitemized'] ??= ['name' => 'Unitemized orders', 'units' => 0, 'cents' => 0];
+                $productTotals['__unitemized']['cents'] += $cents;
+                continue;
+            }
+
+            $remainingCents = $cents;
+            foreach ($items->values() as $index => $item) {
+                $itemCents = $index === $items->count() - 1
+                    ? $remainingCents
+                    : (int) floor($cents * $weights->values()->get($index) / $weightTotal);
+                $remainingCents -= $itemCents;
+                $totalUnits += (int) $item->quantity;
+
+                $category = $item->menuItem?->category?->name
+                    ?? $item->category_name_snapshot
+                    ?? 'Uncategorized';
+                $categoryCents[$category] = ($categoryCents[$category] ?? 0) + $itemCents;
+
+                $productKey = trim((string) $item->item_name) ?: 'Unitemized item';
+                $productTotals[$productKey] ??= ['name' => $productKey, 'units' => 0, 'cents' => 0];
+                $productTotals[$productKey]['units'] += (int) $item->quantity;
+                $productTotals[$productKey]['cents'] += $itemCents;
+            }
+        }
+
+        $productRows = collect($productTotals)->sort(function (array $a, array $b): int {
+            return ($b['units'] <=> $a['units']) ?: ($b['cents'] <=> $a['cents']);
+        })->values();
+        $topProducts = $productRows->take(5)->values()->all();
+        if ($productRows->count() > 5) {
+            $otherProducts = $productRows->slice(5);
+            $topProducts[] = [
+                'name' => 'Other items',
+                'units' => (int) $otherProducts->sum('units'),
+                'cents' => (int) $otherProducts->sum('cents'),
+            ];
+        }
+
+        $salesChart = collect($dailyCents)->map(function (int $cents, string $date) use ($yearly): array {
+            $point = Carbon::createFromFormat($yearly ? 'Y-m' : 'Y-m-d', $date, config('app.timezone'));
+
+            return [
+                'label' => $yearly ? $point->format('M Y') : $point->format('m-d'),
+                'total' => $cents / 100,
+            ];
+        })->values()->all();
+
+        return [
+            'range' => $custom ? 'CUSTOM' : ($yearly ? 'YEAR' : ($range === 'DAILY' ? 'DAILY' : $days.'D')),
+            'from' => $periodStart->toDateString(),
+            'to' => $periodEnd->toDateString(),
+            'totalOrders' => $orders->count(),
+            'totalSales' => $totalCents / 100,
+            'averageOrderValue' => $orders->isEmpty() ? 0 : $totalCents / 100 / $orders->count(),
+            'itemsPerOrder' => $orders->isEmpty() ? 0 : $totalUnits / $orders->count(),
+            'salesChart' => $salesChart,
+            'salesByCategory' => collect($categoryCents)->map(fn (int $cents, string $name): array => [
+                'name' => $name,
+                'sales' => $cents / 100,
+            ])->sortByDesc('sales')->values()->all(),
+            'topProducts' => collect($topProducts)->map(fn (array $product): array => [
+                'name' => $product['name'],
+                'units' => $product['units'],
+                'revenue' => $product['cents'] / 100,
+            ])->all(),
+            'paymentMethods' => collect($methodTotals)->filter(fn (array $method): bool =>
+                $method['orders'] > 0 || $method['method'] !== 'Not recorded'
+            )->map(fn (array $method): array => [
+                'method' => $method['method'],
+                'orders' => $method['orders'],
+                'sales' => $method['cents'] / 100,
+            ])->values()->all(),
+        ];
     }
 
     public function index(Request $request): View

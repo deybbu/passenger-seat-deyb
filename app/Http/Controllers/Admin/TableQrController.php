@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\RestaurantTable;
-use App\Models\SystemSetting;
 use App\Support\TableQrUrl;
 use App\Services\TableSessionStatusService;
+use App\Services\RestaurantTableQrService;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
@@ -25,46 +25,32 @@ class TableQrController extends Controller
 {
     public function index(): View
     {
-        $tables = RestaurantTable::query()->orderBy('table_number')->get();
+        $tables = $this->orderedTables();
         $qrEnabled = $this->qrEnabled();
         $activeCount = $qrEnabled ? $tables->where('is_enabled', true)->count() : 0;
 
         return view('admin.table-qr', compact('tables', 'qrEnabled', 'activeCount'));
     }
 
-    public function toggle(RestaurantTable $restaurantTable): RedirectResponse
+    public function toggle(Request $request, RestaurantTable $restaurantTable, RestaurantTableQrService $qr): RedirectResponse
     {
-        if (! $this->qrEnabled()) {
+        if (! $qr->isGloballyEnabled()) {
             return back()->with('error', 'Customer QR menus are globally disabled in System Settings.');
         }
 
-        DB::transaction(function () use ($restaurantTable): void {
-            $table = RestaurantTable::query()->lockForUpdate()->findOrFail($restaurantTable->id);
-            $enabled = ! $table->is_enabled;
-            $table->update([
-                'is_enabled' => $enabled,
-                'qr_token' => $enabled && ! $table->qr_token ? RestaurantTable::generateUniqueQrToken() : $table->qr_token,
-            ]);
-        }, 3);
+        $table = $qr->toggle($restaurantTable, $request->user());
 
-        return back()->with('success', $restaurantTable->fresh()->is_enabled
-            ? "{$restaurantTable->name} QR ordering enabled."
-            : "{$restaurantTable->name} QR ordering disabled.");
+        return back()->with('success', $table->is_enabled
+            ? "{$table->name} QR ordering enabled."
+            : "{$table->name} QR ordering disabled.");
     }
 
-    public function referenceToggle(RestaurantTable $restaurantTable): JsonResponse
+    public function referenceToggle(Request $request, RestaurantTable $restaurantTable, RestaurantTableQrService $qr): JsonResponse
     {
-        if (! $this->qrEnabled()) {
+        if (! $qr->isGloballyEnabled()) {
             return response()->json(['message' => 'Customer QR menus are globally disabled.'], 409);
         }
-        DB::transaction(function () use ($restaurantTable): void {
-            $table = RestaurantTable::query()->lockForUpdate()->findOrFail($restaurantTable->id);
-            $table->update([
-                'is_enabled' => ! $table->is_enabled,
-                'qr_token' => ! $table->is_enabled && ! $table->qr_token ? RestaurantTable::generateUniqueQrToken() : $table->qr_token,
-            ]);
-        }, 3);
-        return response()->json($this->referenceTable($restaurantTable->fresh()));
+        return response()->json($this->referenceTable($qr->toggle($restaurantTable, $request->user())));
     }
 
     public function referenceStore(Request $request): JsonResponse
@@ -117,14 +103,7 @@ class TableQrController extends Controller
             return response()->json(['message' => TableQrUrl::configurationMessage()], 409);
         }
 
-        $qrCode = new QrCode(
-            data: $url,
-            encoding: new Encoding('UTF-8'),
-            errorCorrectionLevel: ErrorCorrectionLevel::High,
-            size: 360,
-            margin: 16,
-        );
-        $svg = (new SvgWriter())->write($qrCode)->getString();
+        $svg = $this->qrSvg($url);
         $headers = [
             'Content-Type' => 'image/svg+xml; charset=UTF-8',
             'Cache-Control' => 'private, no-store',
@@ -141,10 +120,53 @@ class TableQrController extends Controller
 
     public function printSheet(): View
     {
-        $tables = RestaurantTable::query()->orderBy('table_number')->get();
+        $tables = $this->orderedTables();
         $qrUrlConfigured = TableQrUrl::isConfigured();
 
         return view('admin.table-qr-print', compact('tables', 'qrUrlConfigured'));
+    }
+
+    public function downloadSheet(): Response|JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $tables = $this->orderedTables();
+        if (! TableQrUrl::isConfigured()) {
+            return response()->json(['message' => TableQrUrl::configurationMessage()], 409);
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'passenger-seat-qrs-');
+        $zip = new \ZipArchive();
+        if ($path === false || $zip->open($path, \ZipArchive::OVERWRITE) !== true) {
+            return response()->json(['message' => 'The QR archive could not be created.'], 500);
+        }
+
+        foreach ($tables as $table) {
+            $zip->addFromString('table-'.Str::slug($table->table_number).'-qr.svg', $this->qrSvg(
+                (string) TableQrUrl::forToken($table->qr_token),
+            ));
+        }
+        $zip->close();
+
+        return response()->download($path, 'passenger-seat-table-qrs.zip')->deleteFileAfterSend(true);
+    }
+
+    private function qrSvg(string $url): string
+    {
+        $qrCode = new QrCode(
+            data: $url,
+            encoding: new Encoding('UTF-8'),
+            errorCorrectionLevel: ErrorCorrectionLevel::High,
+            size: 360,
+            margin: 16,
+        );
+
+        return (new SvgWriter())->write($qrCode)->getString();
+    }
+
+    private function orderedTables(): \Illuminate\Database\Eloquent\Collection
+    {
+        return RestaurantTable::query()->get()
+            ->sort(fn (RestaurantTable $a, RestaurantTable $b): int => strnatcasecmp($a->table_number, $b->table_number))
+            ->values();
     }
 
     private function referenceTable(RestaurantTable $table): array
@@ -164,11 +186,6 @@ class TableQrController extends Controller
 
     private function qrEnabled(): bool
     {
-        $setting = SystemSetting::query()->find('qr_enabled');
-        if ($setting === null || $setting->value === null) {
-            return true;
-        }
-
-        return filter_var($setting->value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
+        return app(RestaurantTableQrService::class)->isGloballyEnabled();
     }
 }
