@@ -44,6 +44,19 @@
             </div>
         </div>
     </div>
+    @if ($tableStatuses->isNotEmpty())
+        <section class="card" style="margin-top:18px" aria-labelledby="qr-table-status-heading">
+            <h2 id="qr-table-status-heading">Table status</h2>
+            <div class="cols">
+                @foreach ($tableStatuses as $tableStatus)
+                    <article class="card">
+                        <strong>Table {{ $tableStatus['table_number'] }}</strong>
+                        <p class="mute">{{ $tableStatus['table_status_label'] }} · {{ $tableStatus['table_order_count'] }} orders</p>
+                    </article>
+                @endforeach
+            </div>
+        </section>
+    @endif
 @endsection
 
 @push('scripts')

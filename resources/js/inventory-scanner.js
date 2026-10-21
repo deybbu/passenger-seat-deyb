@@ -9,7 +9,10 @@ let starting = false;
 let generation = 0;
 
 const showMessage = (kind, text) => {
-    status.className = `msg ${kind}`;
+    if (!status) return;
+    status.className = status.classList.contains("admin-inventory-message")
+        ? `admin-inventory-message ${kind}`
+        : `msg ${kind}`;
     status.textContent = text;
 };
 
@@ -19,13 +22,17 @@ const stopScanner = () => {
     animationFrame = null;
     stream?.getTracks().forEach((track) => track.stop());
     stream = null;
-    video.pause();
-    video.srcObject = null;
-    video.classList.add("hide");
-    frame.classList.remove("live");
-    button.disabled = false;
-    button.textContent = "Start camera";
-    hint.textContent = "Point the rear camera at the package barcode";
+    video?.pause();
+    if (video) {
+        video.srcObject = null;
+        video.classList.add("hide");
+    }
+    frame?.classList.remove("live");
+    if (button) {
+        button.disabled = false;
+        button.textContent = button.dataset.startText || "Start camera";
+    }
+    if (hint) hint.textContent = "Point the rear camera at the package barcode";
 };
 
 const supportedBarcodeFormats = async () => {
@@ -57,6 +64,7 @@ const scanFrame = async (detector) => {
 };
 
 const startScanner = async () => {
+    if (!video || !button || !frame || !hint || !status) return;
     if (starting || stream !== null) {
         stopScanner();
         return;
@@ -115,6 +123,6 @@ const startScanner = async () => {
     }
 };
 
-button.addEventListener("click", startScanner);
+button?.addEventListener("click", startScanner);
 document.addEventListener("inventory:camera-stop", stopScanner);
 window.addEventListener("pagehide", stopScanner);

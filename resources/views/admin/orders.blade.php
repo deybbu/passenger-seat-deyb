@@ -4,13 +4,22 @@
 @section('page-title', 'Order management')
 
 @section('content')
-    <div class="admin-card">
+    <div class="admin-orders-page">
+        <div class="admin-card card">
         <div class="admin-card-header">
             <span class="admin-card-title">Orders</span>
             <div class="admin-pill-group">
-                @foreach(['all' => 'All', 'pending' => 'Pending', 'preparing' => 'Preparing', 'ready' => 'Ready', 'completed' => 'Completed'] as $key => $label)
+                @foreach([
+                    'all' => 'All',
+                    'pending' => 'Pending',
+                    'preparing' => 'Preparing',
+                    'ready' => 'Ready',
+                    'completed' => 'Completed',
+                    'cancelled' => 'Cancelled',
+                ] as $key => $label)
                     <a href="{{ route('admin.orders', array_filter(['status' => $key, 'q' => $search ?? null])) }}"
-                       class="admin-pill-btn {{ ($filter ?? 'all') === $key ? 'active' : '' }}">
+                       class="admin-pill-btn {{ ($filter ?? 'all') === $key ? 'active' : '' }}"
+                       @if(($filter ?? 'all') === $key) aria-current="page" @endif>
                         {{ $label }}
                         <span class="admin-tab-count">{{ $counts[$key] ?? 0 }}</span>
                     </a>
@@ -39,6 +48,7 @@
                                 'preparing' => 'badge-preparing',
                                 'ready' => 'badge-ready',
                                 'completed' => 'badge-completed',
+                                'cancelled' => 'badge-cancelled',
                                 default => 'badge-pending',
                             };
                             $next = $order->nextStatus();
@@ -47,7 +57,7 @@
                             <td class="admin-strong">{{ $order->reference_number }}</td>
                             <td>{{ $order->type === 'dine_in' ? 'Dine-in · T' . ($order->table_number ?? '1') : 'Take-out' }}</td>
                             <td>{{ $itemsSummary ?: '—' }}</td>
-                            <td style="font-weight:500;">₱{{ number_format((float) $order->total_amount, 0) }}</td>
+                            <td>₱{{ number_format((float) $order->total_amount, 2) }}</td>
                             <td><span class="badge-status {{ $statusClass }}">{{ ucfirst($order->status) }}</span></td>
                             <td>
                                 @if($next)
@@ -55,7 +65,7 @@
                                         @csrf
                                         @method('PATCH')
                                         <input type="hidden" name="status" value="{{ $next }}">
-                                        <button type="submit" class="btn-red" style="padding:5px 10px;font-size:11px;">Mark {{ ucfirst($next) }}</button>
+                                        <button type="submit" class="btn-red admin-order-status-action">Mark {{ ucfirst($next) }}</button>
                                     </form>
                                 @else
                                     <span class="admin-muted">—</span>
@@ -64,7 +74,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="admin-muted">No orders in this tab yet.</td>
+                            <td colspan="6" class="admin-muted">No orders match this tab or search.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -76,5 +86,6 @@
                 {{ $orders->links() }}
             </div>
         @endif
+        </div>
     </div>
 @endsection

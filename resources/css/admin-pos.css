@@ -1,0 +1,574 @@
+.admin-operation-page {
+    display: grid;
+    gap: 18px;
+    color: var(--tx);
+}
+
+.admin-operation-page {
+    gap: 16px;
+}
+
+.admin-operation-hero,
+.admin-operation-card-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.admin-operation-hero h1,
+.admin-operation-card h2 {
+    margin: 0;
+    color: var(--tx);
+}
+
+.admin-operation-hero h1 {
+    font-size: 22px;
+    line-height: 1.2;
+    font-weight: 600;
+}
+
+.admin-operation-hero p,
+.admin-qr-card > p {
+    margin: 5px 0 0;
+    color: var(--tx2);
+}
+
+.admin-operation-hero form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: min(100%, 430px);
+}
+
+.admin-operation-hero input,
+.admin-register input,
+.admin-register select {
+    min-width: 0;
+    min-height: 42px;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    background: var(--sol);
+    color: var(--tx);
+    font: inherit;
+    padding: 9px 12px;
+}
+
+.admin-operation-hero input {
+    flex: 1;
+}
+
+.admin-operation-button {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--rb);
+    border-radius: 999px;
+    background: var(--rb);
+    color: var(--ps-on-accent);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 0 15px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.admin-operation-button:hover:not(:disabled) {
+    background: var(--red-hover);
+}
+
+.admin-operation-button.secondary {
+    background: var(--sol);
+    color: var(--tx);
+    border-color: var(--bd);
+}
+
+.admin-operation-button:disabled {
+    background: var(--gray);
+    color: var(--tx2);
+    border-color: var(--bd);
+    cursor: not-allowed;
+}
+
+.admin-operation-button:focus-visible,
+.admin-register .btn:focus-visible,
+.admin-register input:focus-visible,
+.admin-register select:focus-visible {
+    outline: 3px solid var(--red);
+    outline-offset: 2px;
+}
+
+.admin-operation-card {
+    min-width: 0;
+    border: 1px solid var(--bd);
+    border-radius: 26px;
+    background: var(--sol);
+    color: var(--tx);
+    padding: 20px;
+    box-shadow: var(--sh);
+}
+
+.admin-operation-count,
+.admin-operation-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--gray);
+    color: var(--tx);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+    padding: 5px 11px;
+    white-space: nowrap;
+}
+
+.admin-operation-badge.enabled,
+.admin-operation-badge.status-completed {
+    background: var(--completed-bg);
+    color: var(--completed-text);
+}
+
+.admin-operation-badge.disabled,
+.admin-operation-badge.status-cancelled {
+    background: var(--out-stock-bg);
+    color: var(--out-stock-text);
+}
+
+.admin-operation-badge.status-pending {
+    background: var(--pending-bg);
+    color: var(--pending-text);
+}
+
+.admin-operation-badge.status-preparing {
+    background: var(--preparing-bg);
+    color: var(--preparing-text);
+}
+
+.admin-operation-badge.status-ready {
+    background: var(--ready-bg);
+    color: var(--ready-text);
+}
+
+.admin-operation-message {
+    border: 1px solid var(--pending-border);
+    border-radius: 12px;
+    background: var(--pending-bg);
+    color: var(--pending-text);
+    padding: 12px 15px;
+}
+
+.admin-operation-empty {
+    display: grid;
+    gap: 5px;
+    color: var(--tx2);
+    text-align: center;
+    padding: 36px 18px;
+}
+
+.admin-operation-empty strong {
+    color: var(--tx);
+}
+
+.admin-operation-table-wrap {
+    overflow-x: auto;
+}
+
+.admin-operation-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: var(--tx);
+    font-size: 13px;
+}
+
+.admin-operation-table th,
+.admin-operation-table td {
+    border-bottom: 1px solid var(--bd);
+    padding: 12px 10px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.admin-operation-table th {
+    color: var(--tx2);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.admin-operation-table tbody tr:hover {
+    background: var(--row-hover);
+}
+
+.admin-qr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 16px;
+}
+
+.admin-qr-card {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-qr-card .admin-operation-card-heading h2 {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.admin-qr-code {
+    display: grid;
+    min-height: 168px;
+    align-content: center;
+    justify-items: center;
+    gap: 9px;
+    border: 1px dashed var(--bd);
+    border-radius: 14px;
+    color: var(--tx2);
+    text-align: center;
+    text-decoration: none;
+}
+
+.admin-qr-code svg {
+    width: 68px;
+    height: 68px;
+}
+
+.admin-qr-code .qr-background {
+    fill: var(--shell);
+}
+
+.admin-qr-code .qr-foreground {
+    fill: var(--tx);
+}
+
+.admin-qr-card form,
+.admin-qr-card .admin-operation-button {
+    width: 100%;
+}
+
+.admin-register .pos {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 380px);
+    align-items: start;
+    gap: 16px;
+}
+
+.admin-register .hide {
+    display: none !important;
+}
+
+.admin-register .card {
+    min-width: 0;
+    border: 1px solid var(--bd);
+    border-radius: 26px;
+    background: var(--sol);
+    color: var(--tx);
+    padding: 17px;
+    box-shadow: var(--sh);
+}
+
+.admin-register .cart {
+    position: sticky;
+    top: calc(var(--ps-topbar-h) + 14px);
+}
+
+.admin-register h2 {
+    margin: 0 0 10px;
+    color: var(--tx);
+    font-size: 16px;
+}
+
+.admin-register .bar,
+.admin-register .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.admin-register .bar input {
+    flex: 1;
+}
+
+.admin-register .cats {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+}
+
+.admin-register .btn {
+    min-height: 40px;
+    border: 1px solid var(--bd);
+    border-radius: 999px;
+    background: var(--sol);
+    color: var(--tx);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 0 13px;
+    cursor: pointer;
+}
+
+.admin-register .btn.on,
+.admin-register .btn.red {
+    border-color: var(--rb);
+    background: var(--rb);
+    color: var(--ps-on-accent);
+}
+
+.admin-register .btn:disabled {
+    border-color: var(--bd);
+    background: var(--gray);
+    color: var(--tx2);
+    cursor: not-allowed;
+}
+
+.admin-register .menu {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 10px;
+}
+
+.admin-register .item {
+    min-width: 0;
+    min-height: 96px;
+    border: 1px solid var(--bd);
+    border-radius: 26px;
+    background: var(--sol);
+    color: var(--tx);
+    padding: 12px;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.admin-register .item:disabled {
+    background: var(--gray);
+    color: var(--tx2);
+    cursor: not-allowed;
+}
+
+.admin-register .item b,
+.admin-register .item small {
+    display: block;
+}
+
+.admin-register .item small,
+.admin-register .mute {
+    color: var(--tx2);
+}
+
+.admin-register .item .p {
+    margin-top: 4px;
+    color: var(--red);
+    font-weight: 700;
+}
+
+.admin-register .thumb {
+    display: block;
+    width: 100%;
+    height: 76px;
+    margin-bottom: 8px;
+    border-radius: 9px;
+    object-fit: cover;
+}
+
+.admin-register .line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--bd);
+    padding: 9px 0;
+}
+
+.admin-register .q {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-register .q button {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--bd);
+    border-radius: 999px;
+    background: var(--sol);
+    color: var(--tx);
+    cursor: pointer;
+}
+
+.admin-register .tot {
+    display: grid;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.admin-register .tot > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.admin-register .tot .g {
+    border-top: 1px solid var(--bd);
+    color: var(--red);
+    font-size: 23px;
+    font-weight: 800;
+    padding-top: 8px;
+}
+
+.admin-register-customer input:first-child {
+    flex: 0 0 105px;
+}
+
+.admin-register-discount {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.admin-register-discount > label,
+.admin-register #cashBox > label {
+    color: var(--tx2);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.admin-register-discount select,
+.admin-register-discount input,
+.admin-register #cashBox > input {
+    width: 100%;
+}
+
+.admin-register input,
+.admin-register select {
+    border-radius: 14px;
+    background: var(--shell);
+}
+
+.admin-register .cats .btn {
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 12px;
+}
+
+.admin-register .cart h2 {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.admin-register .tot .g {
+    font-size: 22px;
+}
+
+.admin-register #did {
+    gap: 6px;
+}
+
+.admin-register #dhint {
+    font-size: 12px;
+}
+
+.admin-register #cashBox {
+    display: grid;
+    gap: 8px;
+}
+
+.admin-register-actions > * {
+    flex: 1;
+}
+
+.admin-register #heldBox {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.admin-register .held-heading {
+    color: var(--tx2);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-register .held-order {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid var(--bd);
+    border-radius: 11px;
+    background: var(--shell);
+    padding: 9px;
+}
+
+.admin-register .held-order-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.admin-register .held-order .btn {
+    min-height: 32px;
+    padding: 0 9px;
+}
+
+.admin-register-toast {
+    position: fixed;
+    z-index: 30;
+    inset: auto auto 20px 50%;
+    transform: translateX(-50%);
+    border-radius: 10px;
+    background: var(--tx);
+    color: var(--sol);
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    padding: 10px 16px;
+    transition: opacity 0.2s ease;
+}
+
+.admin-register-toast.on {
+    opacity: 1;
+}
+
+@media (max-width: 1050px) {
+    .admin-register .pos {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-register .cart {
+        position: static;
+    }
+}
+
+@media (max-width: 620px) {
+    .admin-operation-hero,
+    .admin-operation-card-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .admin-operation-hero form {
+        width: 100%;
+    }
+
+    .admin-register .menu {
+        grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+    }
+
+    .admin-register .card {
+        padding: 13px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-register-toast {
+        transition: none;
+    }
+}

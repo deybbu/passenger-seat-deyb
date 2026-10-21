@@ -22,6 +22,8 @@ class InventoryStockLot extends Model
         'received_by',
         'received_at',
         'storage_zone',
+        'purchase_order_item_id',
+        'supplier_invoice_number',
     ];
 
     protected function casts(): array
@@ -53,5 +55,10 @@ class InventoryStockLot extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(InventoryLog::class, 'stock_lot_id');
+    }
+
+    public function purchaseOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrderItem::class);
     }
 }

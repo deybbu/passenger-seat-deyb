@@ -23,6 +23,16 @@
                 <h2 class="err">Invalid QR code</h2>
                 <p class="mute">We couldn't find this table. Please ask our staff for help.</p>
             </div>
+        @elseif (! $qrEnabled)
+            <div class="center">
+                <h2>Customer QR menus are unavailable</h2>
+                <p class="mute">Online table ordering is currently disabled. Please ask our staff for help.</p>
+            </div>
+        @elseif (! $tableEnabled)
+            <div class="center">
+                <h2>QR ordering is disabled for this table</h2>
+                <p class="mute">Please ask our staff for help with your order.</p>
+            </div>
         @elseif (! $tableOpen)
             <div class="center">
                 <h2>Table {{ $tableNumber }} isn't open yet</h2>

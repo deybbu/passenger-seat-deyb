@@ -24,8 +24,12 @@ return new class extends Migration
 
             if (! ($nullable && $setsNullOnDelete)) {
                 if ($foreignKey !== null) {
-                    Schema::table('inventory_logs', function (Blueprint $table) use ($foreignKey): void {
-                        $table->dropForeign($foreignKey['name']);
+                    $foreignKeyToDrop = DB::connection()->getDriverName() === 'sqlite'
+                        ? ['user_id']
+                        : $foreignKey['name'];
+
+                    Schema::table('inventory_logs', function (Blueprint $table) use ($foreignKeyToDrop): void {
+                        $table->dropForeign($foreignKeyToDrop);
                     });
                 }
 

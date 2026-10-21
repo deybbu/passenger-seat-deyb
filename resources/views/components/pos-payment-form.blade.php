@@ -1,14 +1,25 @@
-@props(['order'])
+@props([
+    'order' => null,
+    'action' => null,
+    'formId' => null,
+    'subtotal' => null,
+    'vatMode' => 'included',
+    'requestedPaymentMethod' => null,
+])
 
 @php
-    $subtotal = round((float) $order->items->sum(fn ($item) => (float) $item->price * (int) $item->quantity), 2);
-    $formId = 'payment-'.$order->id;
+    $subtotal = round((float) ($subtotal ?? $order?->items->sum(fn ($item) => (float) $item->price * (int) $item->quantity)), 2);
+    $formId = $formId ?? 'payment-'.$order->id;
+    $action = $action ?? route('staff.pos.paid', $order);
+    $vat = $vatMode === 'added' ? round($subtotal * 0.12, 2) : round($subtotal * 12 / 112, 2);
+    $total = $vatMode === 'added' ? round($subtotal + $vat, 2) : $subtotal;
 @endphp
 
 <details class="pos-payment-details">
     <summary>Take payment</summary>
-    <form method="POST" action="{{ route('staff.pos.paid', $order) }}" class="pos-payment-form"
-          data-pos-payment-form data-subtotal="{{ number_format($subtotal, 2, '.', '') }}">
+    <form method="POST" action="{{ $action }}" class="pos-payment-form"
+          data-pos-payment-form data-subtotal="{{ number_format($subtotal, 2, '.', '') }}"
+          data-vat-mode="{{ $vatMode }}">
         @csrf
         <label for="{{ $formId }}-discount-type">Discount type</label>
         <select id="{{ $formId }}-discount-type" name="discount_type" data-discount-type>
@@ -31,22 +42,22 @@
             <input id="{{ $formId }}-id-number" name="discount_id_number" type="text" maxlength="80" autocomplete="off">
             <label for="{{ $formId }}-tin">TIN (optional)</label>
             <input id="{{ $formId }}-tin" name="discount_tin" type="text" maxlength="30" autocomplete="off">
-            <p class="pos-hint">20% off the VAT-exclusive price. Cardholder name and ID number are required.</p>
+            <p class="pos-hint">{{ $vatMode === 'added' ? '20% off the subtotal; VAT is exempted.' : '20% off the VAT-exclusive price.' }} Cardholder name and ID number are required.</p>
         </div>
 
         <div class="pos-payment-summary" aria-live="polite">
             <div><span>Subtotal</span><strong data-summary-subtotal>₱{{ number_format($subtotal, 2) }}</strong></div>
             <div data-vat-exemption-row hidden><span>VAT exemption</span><strong data-vat-exemption></strong></div>
             <div><span>Discount</span><strong data-summary-discount>−₱0.00</strong></div>
-            <div class="pos-muted"><span>VAT (12%, included)</span><strong data-summary-vat>₱{{ number_format($subtotal * 12 / 112, 2) }}</strong></div>
-            <div class="pos-payment-total"><span>Total</span><strong data-summary-total>₱{{ number_format($subtotal, 2) }}</strong></div>
+            <div class="pos-muted"><span>VAT (12%, {{ $vatMode }})</span><strong data-summary-vat>₱{{ number_format($vat, 2) }}</strong></div>
+            <div class="pos-payment-total"><span>Total</span><strong data-summary-total>₱{{ number_format($total, 2) }}</strong></div>
         </div>
 
         <label for="{{ $formId }}-method">Payment method</label>
         <select id="{{ $formId }}-method" name="payment_method" data-payment-method required>
-            <option value="cash">Cash</option>
-            <option value="gcash">GCash</option>
-            <option value="card">Card</option>
+            @foreach (['cash' => 'Cash', 'gcash' => 'GCash', 'card' => 'Card'] as $method => $label)
+                <option value="{{ $method }}" @selected($requestedPaymentMethod === $method || ($requestedPaymentMethod === null && $method === 'cash'))>{{ $label }}</option>
+            @endforeach
         </select>
 
         <div data-cash-payment>

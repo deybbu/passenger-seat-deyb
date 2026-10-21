@@ -15,13 +15,22 @@ class User extends Authenticatable
 
     public const ROLES = ['admin', 'kitchen', 'cashier', 'inventory'];
 
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'role_id', 'is_active'];
 
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed'];
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_active' => 'boolean',
+        ];
+    }
+
+    public function assignedRole(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_id');
     }
 
     public function ordersCreated(): HasMany
@@ -32,6 +41,11 @@ class User extends Authenticatable
     public function inventoryLogs(): HasMany
     {
         return $this->hasMany(InventoryLog::class);
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
     }
 
     public function receivedInventoryLots(): HasMany

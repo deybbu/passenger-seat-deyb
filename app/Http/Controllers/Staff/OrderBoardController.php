@@ -17,10 +17,10 @@ class OrderBoardController extends Controller
     public function index(Request $request): View
     {
         $data = [
-            'pending' => Order::with('items')->where('status', 'pending')->oldest()->get(),
-            'preparing' => Order::with('items')->where('status', 'preparing')->oldest()->get(),
-            'ready' => Order::with('items')->where('status', 'ready')->oldest()->get(),
-            'completed' => Order::with('items')->where('status', 'completed')
+            'pending' => Order::query()->notHeld()->with('items')->where('status', 'pending')->oldest()->get(),
+            'preparing' => Order::query()->notHeld()->with('items')->where('status', 'preparing')->oldest()->get(),
+            'ready' => Order::query()->notHeld()->with('items')->where('status', 'ready')->oldest()->get(),
+            'completed' => Order::query()->notHeld()->with('items')->where('status', 'completed')
                 ->whereDate('updated_at', today())->latest('updated_at')->limit(15)->get(),
         ];
 

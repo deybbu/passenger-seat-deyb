@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MenuItem extends Model
 {
@@ -17,6 +18,7 @@ class MenuItem extends Model
     protected $fillable = [
         'menu_category_id', 'name', 'slug', 'description', 'image_path',
         'price', 'is_active', 'is_available', 'is_featured',
+        'archived_at', 'collection_type',
     ];
 
     protected function casts(): array
@@ -26,6 +28,7 @@ class MenuItem extends Model
             'is_active' => 'boolean',
             'is_available' => 'boolean',
             'is_featured' => 'boolean',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -38,6 +41,26 @@ class MenuItem extends Model
     {
         return $this->belongsToMany(Ingredient::class, 'ingredient_menu_item', 'menu_item_id', 'ingredient_id')
             ->withPivot('quantity');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(MenuItemVariant::class);
+    }
+
+    public function modifierGroups(): HasMany
+    {
+        return $this->hasMany(MenuModifierGroup::class);
+    }
+
+    public function bundles(): HasMany
+    {
+        return $this->hasMany(MenuItemBundle::class);
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(MenuTag::class);
     }
 
     public function scopeWithStockAvailability(Builder $query): Builder

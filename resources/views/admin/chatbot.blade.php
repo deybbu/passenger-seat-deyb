@@ -1,52 +1,52 @@
 @extends('layouts.admin')
 
-@section('title', 'AI chatbot & knowledge base')
-@section('page-title', 'AI chatbot & knowledge base')
+@section('title', 'FAQ and chatbot management')
+@section('page-title', 'FAQ and chatbot management')
 
 @section('content')
-    <div class="admin-card" style="margin-bottom:16px;">
-        <div class="admin-card-header"><span class="admin-card-title">Operations assistant</span></div>
-        <div class="admin-chat-log" aria-live="polite">
-            @forelse($messages as $message)
-                <div class="admin-chat-bubble {{ $message['role'] }}">{{ $message['text'] }}</div>
+    <div class="admin-two-column-grid">
+        <div class="admin-card">
+            <div class="admin-card-header"><span class="admin-card-title">FAQ</span></div>
+            @forelse($faqs as $faq)<p><strong>{{ $faq->question }}</strong><br>{{ $faq->answer }}</p>@empty<p class="admin-muted">No FAQs yet.</p>@endforelse
+            <form method="POST" action="{{ route('admin.chatbot.faq.store') }}" class="admin-form-grid">
+                @csrf
+                <label class="admin-field">Question<input name="question" required maxlength="500"></label>
+                <label class="admin-field">Answer<textarea name="answer" rows="2" required maxlength="5000"></textarea></label>
+                <button class="btn-red" type="submit">Add Q&amp;A</button>
+            </form>
+        </div>
+        <div class="admin-card">
+            <div class="admin-card-header"><span class="admin-card-title">Unanswered questions</span></div>
+            @forelse($unanswered as $question)
+                <form method="POST" action="{{ route('admin.chatbot.unanswered.answer', $question) }}" style="margin-bottom:12px;">
+                    @csrf
+                    <strong>{{ $question->question }}</strong>
+                    <div class="admin-inline-actions"><input name="answer" placeholder="Type the answer" required style="flex:1;"><button class="btn-outline" type="submit">Teach</button></div>
+                </form>
             @empty
-                <p class="admin-muted">Ask about opening hours, inventory, or order flow.</p>
+                <p class="admin-muted">All caught up.</p>
             @endforelse
         </div>
-        <form method="POST" action="{{ route('admin.chatbot.message') }}" class="admin-form-grid">
-            @csrf
-            <label class="admin-field" style="grid-column:1/-1;">Message
-                <input type="text" name="message" maxlength="500" required placeholder="Ask a question about restaurant operations">
-            </label>
-            <div><button type="submit" class="btn-red">Send message</button></div>
-        </form>
     </div>
-
-    <div class="admin-card" style="margin-bottom:16px;">
-        <div class="admin-card-header"><span class="admin-card-title">Add knowledge article</span></div>
-        <form method="POST" action="{{ route('admin.chatbot.knowledge') }}" class="admin-form-grid">
-            @csrf
-            <label class="admin-field">Title
-                <input type="text" name="title" maxlength="120" required>
-            </label>
-            <label class="admin-field" style="grid-column:span 2;">Answer
-                <textarea name="body" maxlength="1000" rows="3" required></textarea>
-            </label>
-            <div><button type="submit" class="btn-outline">Add article</button></div>
-        </form>
-    </div>
-
-    <div class="admin-card">
-        <div class="admin-card-header"><span class="admin-card-title">Knowledge base</span></div>
-        <div class="admin-table-wrap">
-            <table class="admin-data-table">
-                <thead><tr><th>Topic</th><th>Answer</th></tr></thead>
-                <tbody>
-                    @foreach($articles as $article)
-                        <tr><td class="admin-strong">{{ $article['title'] }}</td><td>{{ $article['body'] }}</td></tr>
-                    @endforeach
-                </tbody>
-            </table>
+    <div class="admin-two-column-grid" style="margin-top:16px;">
+        <div class="admin-card">
+            <div class="admin-card-header"><span class="admin-card-title">Persona &amp; guardrails</span></div>
+            <form method="POST" action="{{ route('admin.chatbot.settings') }}">
+                @csrf
+                <label class="admin-field">Tone<select name="persona"><option @selected($settings['persona'] === 'Warm & professional')>Warm &amp; professional</option><option @selected($settings['persona'] === 'Trendy & casual')>Trendy &amp; casual</option></select></label>
+                <label><input type="checkbox" name="guardrail_calendar" value="1" @checked($settings['guardrail_calendar'])> Never promise open dates without checking the calendar</label>
+                <button class="btn-outline" type="submit">Save chatbot settings</button>
+            </form>
+        </div>
+        <div class="admin-card">
+            <div class="admin-card-header"><span class="admin-card-title">Knowledge sources</span></div>
+            @forelse($sources as $source)<p><strong>{{ $source->title }}</strong><br><span class="admin-muted">{{ \Illuminate\Support\Str::limit($source->content, 160) }}</span></p>@empty<p class="admin-muted">No knowledge sources yet.</p>@endforelse
+            <form method="POST" action="{{ route('admin.chatbot.knowledge') }}" class="admin-form-grid">
+                @csrf
+                <label class="admin-field">Source title<input name="title" required maxlength="150"></label>
+                <label class="admin-field">Content<textarea name="body" required maxlength="5000" rows="2"></textarea></label>
+                <button class="btn-outline" type="submit">Add source</button>
+            </form>
         </div>
     </div>
 @endsection

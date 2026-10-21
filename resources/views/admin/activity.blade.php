@@ -8,19 +8,18 @@
         <div class="admin-card-header"><span class="admin-card-title">Recent inventory activity</span></div>
         <div class="admin-table-wrap">
             <table class="admin-data-table">
-                <thead><tr><th>Time</th><th>Ingredient</th><th>Action</th><th>Quantity</th><th>By</th><th>Notes</th></tr></thead>
+                <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th><th>Details</th></tr></thead>
                 <tbody>
                     @forelse($logs as $log)
                         <tr>
                             <td>{{ $log->created_at->format('M j, g:i A') }}</td>
-                            <td class="admin-strong">{{ $log->ingredient->name ?? 'Deleted ingredient' }}</td>
-                            <td>{{ ucfirst(str_replace('_', ' ', $log->type)) }}</td>
-                            <td>{{ $log->quantity }} {{ $log->ingredient->unit ?? '' }}</td>
                             <td>{{ $log->user->name ?? 'System' }}</td>
-                            <td>{{ $log->notes ?? '—' }}</td>
+                            <td class="admin-strong">{{ $log->action }}</td>
+                            <td>{{ $log->module }}</td>
+                            <td>{{ empty($log->metadata) ? '—' : json_encode($log->metadata) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="admin-muted">No inventory activity has been recorded yet.</td></tr>
+                        <tr><td colspan="5" class="admin-muted">No activity has been recorded yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

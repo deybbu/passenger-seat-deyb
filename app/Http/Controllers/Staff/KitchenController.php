@@ -36,6 +36,7 @@ class KitchenController extends Controller
     private function boardData(): array
     {
         $orders = Order::query()
+            ->notHeld()
             ->with('items')
             ->whereIn('status', ['pending', 'preparing', 'ready'])
             ->oldest('created_at')

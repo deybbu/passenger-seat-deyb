@@ -7,7 +7,7 @@
     <div>
         <p class="text-xs font-bold uppercase tracking-[.2em] text-brand-700">Customer QR ordering</p>
         <h1 class="mt-1 text-3xl font-black">Table sessions</h1>
-        <p class="mt-2 text-sm text-gray-600">Open a table before guests scan its QR link. Sessions expire after three hours.</p>
+        <p class="mt-2 text-sm text-gray-600">Unpaid table sessions remain open until a cashier closes them; they do not expire automatically.</p>
     </div>
 </div>
 
@@ -24,6 +24,28 @@
     </div>
     <button type="submit" class="rounded-xl bg-brand-600 px-5 py-3 font-bold text-white hover:bg-brand-700">Open table QR</button>
 </form>
+
+<section aria-labelledby="table-status-heading" class="mb-6">
+    <div class="mb-3 flex items-center justify-between">
+        <h2 id="table-status-heading" class="text-xl font-black">Table status</h2>
+        <span class="text-sm text-gray-600">Open tab · bill requested · free</span>
+    </div>
+    @if ($tableStatuses->isNotEmpty())
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach ($tableStatuses as $tableStatus)
+                <article class="rounded-xl border border-gray-200 bg-white p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <strong>Table {{ $tableStatus['table_number'] }}</strong>
+                        <span class="text-sm font-bold">{{ $tableStatus['table_status_label'] }}</span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-600">{{ $tableStatus['table_order_count'] }} orders{{ $tableStatus['qr_enabled'] ? '' : ' · QR disabled' }}</p>
+                </article>
+            @endforeach
+        </div>
+    @else
+        <p class="text-sm text-gray-600">No restaurant tables have been configured.</p>
+    @endif
+</section>
 
 <section aria-labelledby="active-tables-heading">
     <div class="mb-3 flex items-center justify-between">
@@ -46,15 +68,13 @@
                 <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div class="flex items-start justify-between gap-3">
                         <div><p class="text-xs font-bold uppercase tracking-wider text-gray-500">Table</p><h3 class="text-2xl font-black">{{ $session->table_number }}</h3></div>
-                        @if ($session->expires_at && $session->expires_at->isPast())
-                            <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-900">QR expired</span>
-                        @elseif ($session->bill_requested_at)
+                        @if ($session->status === 'bill_requested' || $session->bill_requested_at)
                             <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">Bill requested</span>
                         @else
-                            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900">Ordering open</span>
+                            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900">Open tab</span>
                         @endif
                     </div>
-                    <p class="mt-3 text-sm text-gray-600">{{ $session->guest_count }} guests · Expires {{ $session->expires_at?->format('M j, g:i A') ?? 'never' }}</p>
+                    <p class="mt-3 text-sm text-gray-600">{{ $session->guest_count }} guests · Opened {{ $session->opened_at?->format('M j, g:i A') ?? 'at an unknown time' }}</p>
                     <a class="mt-3 block break-all text-sm font-semibold text-brand-700 underline" href="{{ route('customer.qr.show', ['table' => $session->table_number]) }}" target="_blank" rel="noopener">
                         {{ route('customer.qr.show', ['table' => $session->table_number]) }}
                     </a>
@@ -69,9 +89,6 @@
                         @endforelse
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
-                        <form method="POST" action="{{ route('staff.tables.extend', $session) }}">@csrf @method('PATCH')
-                            <button class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-bold hover:bg-gray-50">Extend 30 min</button>
-                        </form>
                         @if (! $session->bill_requested_at)
                             <form method="POST" action="{{ route('staff.tables.bill', $session) }}">@csrf @method('PATCH')
                                 <button class="rounded-lg border border-amber-300 px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-50">Mark bill requested</button>

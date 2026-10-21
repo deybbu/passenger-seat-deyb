@@ -9,7 +9,13 @@
 <article class="oc {{ $timerClass }}" data-order-status="{{ $order->status }}">
     <div class="oh">
         <div>
-            <b class="tb">{{ $order->table_number ? 'Table '.$order->table_number : $orderTypeLabel }}</b>
+            <b class="tb">
+                @if ($order->source === 'table_qr' && $order->table_session_id && $order->batch_number)
+                    Table {{ $order->table_number }} - Order {{ $order->batch_number }}
+                @else
+                    {{ $order->table_number ? 'Table '.$order->table_number : $orderTypeLabel }}
+                @endif
+            </b>
             <small>{{ $order->reference_number }}</small>
         </div>
         <span class="ty">{{ $orderTypeLabel }}</span>
@@ -23,7 +29,18 @@
     </div>
     <ul>
         @foreach ($order->items as $item)
-            <li><b>{{ $item->quantity }}x</b><span>{{ $item->item_name }}</span></li>
+            <li>
+                <b>{{ $item->quantity }}x</b>
+                <span>
+                    {{ $item->item_name }}
+                    @if ($item->variant_name_snapshot)
+                        <small>{{ $item->variant_name_snapshot }}</small>
+                    @endif
+                    @if ($item->modifier_snapshot)
+                        <small>{{ collect($item->modifier_snapshot)->pluck('name')->filter()->join(', ') }}</small>
+                    @endif
+                </span>
+            </li>
         @endforeach
         @if ($order->special_instructions)
             <li><b>Note</b><span><small>{{ $order->special_instructions }}</small></span></li>

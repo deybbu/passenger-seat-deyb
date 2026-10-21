@@ -29,8 +29,13 @@ The following steps describe how to integrate this project's application files i
    php artisan migrate --seed
    npm install
    npm run build
-   php artisan serve
+   php artisan serve --host=0.0.0.0
    ```
+   For same-Wi-Fi table QR testing, set `APP_URL` to this computer's current LAN
+   IPv4 address (for example, `http://192.168.1.5:8000`) and restart the server
+   after changing it. Binding to `0.0.0.0` makes the development server reachable
+   from devices on the network; use it only on a trusted network, not as a
+   production deployment.
 7. Create staff users securely through a trusted seeder, Tinker, or an admin-only user-management screen. Do not expose public staff registration.
 
 ## Important production notes

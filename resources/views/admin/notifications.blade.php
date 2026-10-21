@@ -31,4 +31,14 @@
             @endforelse
         </div>
     </div>
+    <div class="admin-card" style="margin-top:16px;">
+        <div class="admin-card-header"><span class="admin-card-title">Alert rules</span></div>
+        <div class="admin-table-wrap"><table class="admin-data-table"><thead><tr><th>Trigger</th><th>Action</th><th>On</th></tr></thead><tbody>
+            @forelse($rules as $rule)
+                <tr><td>{{ $rule->trigger }}</td><td>{{ $rule->action }}</td><td><form method="POST" action="{{ route('admin.notifications.rules.toggle', $rule) }}">@csrf @method('PATCH')<button class="btn-outline" type="submit">{{ $rule->is_enabled ? 'On' : 'Off' }}</button></form></td></tr>
+            @empty
+                <tr><td colspan="3" class="admin-muted">No alert rules configured.</td></tr>
+            @endforelse
+        </tbody></table></div>
+    </div>
 @endsection

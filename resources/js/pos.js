@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const cashPayment = form.querySelector('[data-cash-payment]');
         const cashTendered = form.querySelector('[data-cash-tendered]');
         const error = form.querySelector('[data-payment-error]');
-        let calculatedTotal = subtotal;
+        const vatAdded = form.dataset.vatMode === 'added';
+        let calculatedTotal = vatAdded ? cents(subtotal + cents(subtotal * 0.12)) : subtotal;
 
         const update = () => {
             const type = discountType.value;
@@ -26,8 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const isCash = paymentMethod.value === 'cash';
             let vatExemption = 0;
             let discount = 0;
-            let total = subtotal;
-            let vat = cents(subtotal * 12 / 112);
+            let vat = vatAdded ? cents(subtotal * 0.12) : cents(subtotal * 12 / 112);
+            let total = vatAdded ? cents(subtotal + vat) : subtotal;
 
             customDiscount.hidden = !isCustom;
             discountRate.required = isCustom;
@@ -46,16 +47,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isCash) cashTendered.value = '';
 
             if (hasIdDiscount) {
-                const vatExclusive = cents(subtotal / 1.12);
-                vatExemption = cents(subtotal - vatExclusive);
-                discount = cents(vatExclusive * 0.2);
-                total = cents(vatExclusive - discount);
+                if (vatAdded) {
+                    discount = cents(subtotal * 0.2);
+                    total = cents(subtotal - discount);
+                } else {
+                    const vatExclusive = cents(subtotal / 1.12);
+                    vatExemption = cents(subtotal - vatExclusive);
+                    discount = cents(vatExclusive * 0.2);
+                    total = cents(vatExclusive - discount);
+                }
                 vat = 0;
             } else if (isCustom) {
                 const rate = Math.min(100, Math.max(0, Number(discountRate.value) || 0));
                 discount = cents(subtotal * rate / 100);
-                total = cents(subtotal - discount);
-                vat = cents(total * 12 / 112);
+                const taxableAmount = cents(subtotal - discount);
+                if (vatAdded) {
+                    vat = cents(taxableAmount * 0.12);
+                    total = cents(taxableAmount + vat);
+                } else {
+                    total = taxableAmount;
+                    vat = cents(total * 12 / 112);
+                }
             }
 
             calculatedTotal = total;

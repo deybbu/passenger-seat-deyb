@@ -68,6 +68,11 @@
                                     </span>
                                 </td>
                                 <td>
+                                    <form method="POST" action="{{ route('admin.menu-management.archive', $item) }}" style="margin-bottom:6px;" onsubmit="return confirm('Archive this menu item? It will be removed from POS availability.');">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="btn-outline" style="padding:5px 10px;font-size:11px;">Archive</button>
+                                    </form>
                                     <form method="POST" action="{{ route('admin.menu-management.toggle', $item) }}">
                                         @csrf
                                         @method('PATCH')
@@ -78,7 +83,7 @@
                                     <form method="POST" action="{{ route('admin.menu-management.destroy', $item) }}" style="margin-top:6px;" onsubmit="return confirm('Permanently delete this menu item? Previous order records will remain intact.');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn-outline" style="padding:5px 10px;font-size:11px;color:#b91c1c;border-color:#fecaca;">
+                                        <button type="submit" class="btn-outline admin-danger-action" style="padding:5px 10px;font-size:11px;">
                                             Delete
                                         </button>
                                     </form>

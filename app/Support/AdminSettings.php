@@ -17,6 +17,7 @@ class AdminSettings
             'close_time' => '22:00',
             'low_stock_alerts' => true,
             'order_alerts' => true,
+            'recipe_target_percent' => 30,
         ];
     }
 

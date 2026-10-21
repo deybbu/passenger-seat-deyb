@@ -7,7 +7,7 @@
         <div>
             <p class="pos-eyebrow">Cashier · Order records</p>
             <h1>Transaction ledger</h1>
-            <p>Payments and order status remain attached to the same order record.</p>
+            <p>Order records and table-session payment adjustments are listed below.</p>
         </div>
     </div>
 
@@ -91,4 +91,65 @@
     </div>
 
     <div class="pos-pagination">{{ $orders->withQueryString()->links() }}</div>
+
+    <div class="pos-page-heading" style="margin-top:28px">
+        <div>
+            <p class="pos-eyebrow">Shared table tabs</p>
+            <h2>Table-session payments</h2>
+        </div>
+    </div>
+    <div class="pos-table-wrap">
+        <table class="pos-table">
+            <thead>
+                <tr>
+                    <th>Recorded</th>
+                    <th>Table</th>
+                    <th>Record</th>
+                    <th>Payment method</th>
+                    <th>Cashier / manager</th>
+                    <th class="is-numeric">Amount</th>
+                    <th>Audit / action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($sessionPayments as $payment)
+                    <tr>
+                        <td>{{ $payment->created_at->format('Y-m-d H:i') }}</td>
+                        <td>Table {{ $payment->tableSession?->table_number ?? '—' }}</td>
+                        <td>
+                            <strong>{{ $payment->payment_reference }}</strong>
+                            <small class="pos-table-subtext">{{ str($payment->type)->headline() }}</small>
+                        </td>
+                        <td>{{ strtoupper($payment->payment_method) }}</td>
+                        <td>{{ $payment->performedBy?->name ?? 'Former staff member' }}</td>
+                        <td class="is-numeric">
+                            <strong>{{ $payment->type === 'reversal' ? '−' : '' }}₱{{ number_format((float) $payment->amount, 2) }}</strong>
+                        </td>
+                        <td>
+                            @if ($payment->type === 'reversal')
+                                <span>Reverses {{ $payment->reversalOf?->payment_reference ?? 'payment' }}</span>
+                                @if ($payment->notes)
+                                    <small class="pos-table-subtext">{{ $payment->notes }}</small>
+                                @endif
+                            @elseif ($payment->reversal)
+                                <span>Reversed by {{ $payment->reversal->payment_reference }}</span>
+                            @elseif ($canReopenTableBills && $payment->tableSession?->status === 'closed')
+                                <form method="POST" action="{{ route('staff.pos.table-session-reopen', $payment->tableSession) }}">
+                                    @csrf
+                                    <label for="reopen-reason-{{ $payment->id }}">Reason for reopening</label>
+                                    <input id="reopen-reason-{{ $payment->id }}" name="reason" type="text" maxlength="500" required>
+                                    <button type="submit" class="pos-text-link">Reopen bill</button>
+                                </form>
+                            @else
+                                <span>—</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="7" class="pos-table-empty">No table-session payment records yet.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+    <div class="pos-pagination">{{ $sessionPayments->links() }}</div>
 @endsection

@@ -1,3 +1,8 @@
+import './admin-dashboard.js';
+import './admin-inventory.js';
+import './pos-register.js';
+import './inventory-scanner.js';
+
 const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
 function showClientStatus(message, isError = false) {
@@ -28,6 +33,24 @@ function setUnread(count) {
     });
 }
 
+function applyAdminTheme(theme, persist = false) {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    root.style.colorScheme = theme;
+    document.querySelectorAll('[data-admin-theme]').forEach((button) => {
+        const active = button.dataset.adminTheme === theme;
+        button.setAttribute('aria-pressed', String(active));
+    });
+
+    if (persist) {
+        try {
+            localStorage.setItem('ps-app-theme', theme);
+        } catch {
+            showClientStatus('Theme changed, but this browser could not save your preference.', true);
+        }
+    }
+}
+
 async function postAlert(url, body = {}) {
     const response = await fetch(url, {
         method: 'POST',
@@ -53,11 +76,38 @@ function markItemsRead(items) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const sidebarNav = document.getElementById('nav');
+    const sidebarScrollKey = 'passenger-seat-admin-sidebar-scroll';
+    if (sidebarNav) {
+        const savedScroll = Number.parseInt(sessionStorage.getItem(sidebarScrollKey) || '0', 10);
+        if (Number.isFinite(savedScroll)) {
+            requestAnimationFrame(() => {
+                sidebarNav.scrollTop = savedScroll;
+            });
+        }
+        const saveSidebarScroll = () => {
+            sessionStorage.setItem(sidebarScrollKey, String(sidebarNav.scrollTop));
+        };
+        sidebarNav.addEventListener('scroll', saveSidebarScroll, { passive: true });
+        document.querySelectorAll('#nav a').forEach((link) => {
+            link.addEventListener('click', saveSidebarScroll);
+        });
+    }
+
+    const initialTheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+    applyAdminTheme(initialTheme);
+    document.querySelectorAll('[data-admin-theme]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const theme = button.dataset.adminTheme;
+            if (theme === 'light' || theme === 'dark') applyAdminTheme(theme, true);
+        });
+    });
+
     document.getElementById('adminSidebarToggle')?.addEventListener('click', () => toggleSidebar());
     document.getElementById('adminOverlay')?.addEventListener('click', () => toggleSidebar(true));
 
     window.addEventListener('resize', () => {
-        if (window.innerWidth > 768) toggleSidebar(true);
+        if (window.innerWidth > 860) toggleSidebar(true);
     });
 
     const panel = document.getElementById('adminNotifyPanel');
@@ -73,6 +123,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (event) => {
         if (!panel || panel.hasAttribute('hidden')) return;
         if (!(event.target instanceof Element) || event.target.closest('.admin-notify-wrap')) return;
+        panel.setAttribute('hidden', '');
+        notifyBtn?.setAttribute('aria-expanded', 'false');
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        toggleSidebar(true);
+        if (!panel || panel.hasAttribute('hidden')) return;
         panel.setAttribute('hidden', '');
         notifyBtn?.setAttribute('aria-expanded', 'false');
     });

@@ -94,7 +94,11 @@ class OrderController extends Controller
 
     public function thankYou(string $reference): View
     {
-        $order = Order::query()->with('items')->where('reference_number', $reference)->firstOrFail();
+        $order = Order::query()
+            ->notHeld()
+            ->with('items')
+            ->where('reference_number', $reference)
+            ->firstOrFail();
 
         return view('customer.thank-you', compact('order'));
     }
@@ -102,6 +106,7 @@ class OrderController extends Controller
     public function board(): View
     {
         $orders = Order::query()
+            ->notHeld()
             ->with('items')
             ->whereIn('status', ['pending', 'preparing'])
             ->latest()

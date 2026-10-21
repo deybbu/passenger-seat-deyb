@@ -11,6 +11,8 @@ use App\Models\InventoryStockLot;
 use App\Models\Order;
 use App\Models\OrderIngredientReservation;
 use App\Models\PreparationRecipe;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +29,7 @@ final class InventoryService
     /**
      * Total ingredient quantities an order needs.
      *
-     * @param  Collection<int, object{item: \App\Models\MenuItem, qty: int}>  $lines
+     * @param  Collection<int, object{item: \App\Models\MenuItem, qty: int, variant?: ?\App\Models\MenuItemVariant}>  $lines
      * @return array<int,float> ingredient_id => quantity
      */
     public function requirements(Collection $lines): array
@@ -38,7 +40,9 @@ final class InventoryService
             foreach ($line->item->ingredients as $ingredient) {
                 $needs[$ingredient->id] = ($needs[$ingredient->id] ?? 0.0)
                     + $ingredient->rawQuantityForPortion(
-                        (float) $ingredient->pivot->quantity * (int) $line->qty,
+                        (float) $ingredient->pivot->quantity
+                            * (isset($line->variant) ? (float) $line->variant->portion_factor : 1.0)
+                            * (int) $line->qty,
                     );
             }
         }
@@ -288,46 +292,135 @@ final class InventoryService
                 throw new \DomainException('Enter a package quantity before confirming this receipt.');
             }
 
+            return $this->recordPackageReceipt(
+                $ingredient,
+                $package,
+                round($quantity, 3),
+                $barcode,
+                $receiptToken,
+                $batchNumber,
+                $expiresAt,
+                $storageZone,
+                $actor,
+                $ingredient->unit_cost === null ? null : (float) $ingredient->unit_cost,
+                false,
+                null,
+                null,
+                "Received barcode {$barcode}; batch {$batchNumber}; expires {$expiresAt}; stored in {$storageZone}.",
+            );
+        });
+    }
+
+    /** Receive a barcode-matched delivery against its open purchase-order line. */
+    public function receivePurchaseOrderPackage(
+        string $barcode,
+        int $purchaseOrderItemId,
+        float $quantity,
+        ?float $invoiceUnitCost,
+        string $invoiceNumber,
+        string $batchNumber,
+        string $expiresAt,
+        ?string $storageZone,
+        string $receiptToken,
+        User $actor,
+    ): array {
+        return DB::transaction(function () use (
+            $barcode,
+            $purchaseOrderItemId,
+            $quantity,
+            $invoiceUnitCost,
+            $invoiceNumber,
+            $batchNumber,
+            $expiresAt,
+            $storageZone,
+            $receiptToken,
+            $actor,
+        ): array {
+            if (InventoryStockLot::query()->where('receipt_token', $receiptToken)->exists()) {
+                throw new \DomainException('This receipt was already confirmed. Scan the package again for a new delivery.', 409);
+            }
+
+            $orderItem = PurchaseOrderItem::query()
+                ->lockForUpdate()
+                ->findOrFail($purchaseOrderItemId);
+            $purchaseOrder = PurchaseOrder::query()
+                ->lockForUpdate()
+                ->findOrFail($orderItem->purchase_order_id);
+            if (! in_array($purchaseOrder->status, ['open', 'partial'], true) || $purchaseOrder->closed_at !== null) {
+                throw new \DomainException('This purchase order is no longer open for receiving.', 409);
+            }
+
+            $package = InventoryPackage::query()
+                ->where('barcode', $barcode)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+            $ingredient = $package !== null
+                ? Ingredient::query()->lockForUpdate()->find($package->ingredient_id)
+                : Ingredient::query()->where('barcode', $barcode)->lockForUpdate()->first();
+
+            if ($ingredient === null) {
+                throw new \DomainException('This barcode is not registered to an active package or ingredient.');
+            }
+            if ((int) $orderItem->ingredient_id !== (int) $ingredient->id) {
+                throw new \DomainException('The scanned item does not match this purchase-order line.');
+            }
+
+            $remaining = round((float) $orderItem->ordered_quantity - (float) $orderItem->received_quantity, 3);
             $quantity = round($quantity, 3);
-            $before = round((float) $ingredient->current_stock, 3);
-            $after = round($before + $quantity, 3);
-            $ingredient->update(['current_stock' => $after]);
+            if ($remaining < 0.001) {
+                throw new \DomainException('This purchase-order line has already been received.', 409);
+            }
+            if ($quantity < 0.001 || $quantity > $remaining + self::EPSILON) {
+                throw new \DomainException(
+                    'Over-delivery: the received quantity cannot exceed the '.number_format($remaining, 3).' remaining on this purchase order.'
+                );
+            }
+            if (trim($invoiceNumber) === '' || trim($batchNumber) === '') {
+                throw new \DomainException('Invoice number and batch code are required.');
+            }
 
-            $lot = InventoryStockLot::create([
-                'ingredient_id' => $ingredient->id,
-                'package_id' => $package?->id,
-                'batch_number' => $batchNumber,
-                'expires_at' => $expiresAt,
-                'received_quantity' => $quantity,
-                'remaining_quantity' => $quantity,
-                'unit_cost' => $ingredient->unit_cost,
-                'receipt_token' => $receiptToken,
-                'received_by' => $actor->id,
-                'received_at' => now(),
-                'storage_zone' => $storageZone,
+            $unitCost = $invoiceUnitCost === null
+                ? ($ingredient->unit_cost === null ? null : (float) $ingredient->unit_cost)
+                : round($invoiceUnitCost, 4);
+            $receipt = $this->recordPackageReceipt(
+                $ingredient,
+                $package,
+                $quantity,
+                $barcode,
+                $receiptToken,
+                trim($batchNumber),
+                $expiresAt,
+                $storageZone,
+                $actor,
+                $unitCost,
+                $invoiceUnitCost !== null,
+                $orderItem->id,
+                trim($invoiceNumber),
+                "Received barcode {$barcode} against {$purchaseOrder->reference}; invoice {$invoiceNumber}; batch {$batchNumber}; expires {$expiresAt}.",
+            );
+
+            $orderItem->update([
+                'received_quantity' => round((float) $orderItem->received_quantity + $quantity, 3),
             ]);
-
-            InventoryLog::create([
-                'ingredient_id' => $ingredient->id,
-                'stock_lot_id' => $lot->id,
-                'user_id' => $actor->id,
-                'type' => 'stock_in',
-                'quantity' => $quantity,
-                'stock_before' => $before,
-                'stock_after' => $after,
-                'notes' => mb_substr(
-                    "Received barcode {$barcode}; batch {$batchNumber}; expires {$expiresAt}; stored in {$storageZone}.",
-                    0,
-                    500,
-                ),
+            $items = PurchaseOrderItem::query()
+                ->where('purchase_order_id', $purchaseOrder->id)
+                ->get(['ordered_quantity', 'received_quantity']);
+            $complete = $items->isNotEmpty() && $items->every(
+                fn (PurchaseOrderItem $item): bool => (float) $item->received_quantity >= (float) $item->ordered_quantity,
+            );
+            $hasReceipts = $items->contains(fn (PurchaseOrderItem $item): bool => (float) $item->received_quantity > 0);
+            $purchaseOrder->update([
+                'invoice_number' => trim($invoiceNumber),
+                'status' => $complete ? 'completed' : ($hasReceipts ? 'partial' : 'open'),
+                'closed_at' => $complete ? now() : null,
             ]);
 
             return [
-                'ingredient' => $ingredient,
-                'lot' => $lot,
-                'current_stock' => $before,
-                'package_quantity' => $quantity,
-                'expected_stock' => $after,
+                ...$receipt,
+                'purchase_order' => $purchaseOrder,
+                'received_quantity' => $quantity,
+                'remaining_quantity' => round($remaining - $quantity, 3),
             ];
         });
     }
@@ -448,15 +541,16 @@ final class InventoryService
         string $reason,
         string $details,
         ?User $actor,
+        ?string $stage = null,
     ): ?float {
-        return DB::transaction(function () use ($ingredient, $quantity, $reason, $details, $actor): ?float {
+        return DB::transaction(function () use ($ingredient, $quantity, $reason, $details, $actor, $stage): ?float {
             if (trim($reason) === '' || trim($details) === '') {
                 throw new \DomainException('Waste requires a reason and details.');
             }
 
             $locked = Ingredient::query()->lockForUpdate()->findOrFail($ingredient->id);
             $this->assertDoesNotConsumeReservedStock($locked, 'waste', $quantity);
-            $movementLots = $this->apply($locked, 'waste', $quantity, $actor, trim($details), null, $reason);
+            $movementLots = $this->apply($locked, 'waste', $quantity, $actor, trim($details), null, $reason, $stage);
             $costedLots = collect($movementLots)->filter(fn (array $lot): bool => $lot['unit_cost'] !== null);
 
             if ($costedLots->count() !== count($movementLots)) {
@@ -706,6 +800,73 @@ final class InventoryService
         }
     }
 
+    /**
+     * @return array{ingredient: Ingredient, lot: InventoryStockLot, current_stock: float, package_quantity: float, expected_stock: float}
+     */
+    private function recordPackageReceipt(
+        Ingredient $ingredient,
+        ?InventoryPackage $package,
+        float $quantity,
+        string $barcode,
+        string $receiptToken,
+        string $batchNumber,
+        string $expiresAt,
+        ?string $storageZone,
+        User $actor,
+        ?float $unitCost,
+        bool $updateUnitCost,
+        ?int $purchaseOrderItemId,
+        ?string $invoiceNumber,
+        string $notes,
+    ): array {
+        $quantity = round($quantity, 3);
+        $before = round((float) $ingredient->current_stock, 3);
+        $after = round($before + $quantity, 3);
+        $lotUnitCost = $updateUnitCost
+            ? $unitCost
+            : ($ingredient->unit_cost === null ? null : (float) $ingredient->unit_cost);
+        $ingredientChanges = ['current_stock' => $after];
+        if ($updateUnitCost) {
+            $ingredientChanges['unit_cost'] = $unitCost;
+        }
+        $ingredient->update($ingredientChanges);
+
+        $lot = InventoryStockLot::create([
+            'ingredient_id' => $ingredient->id,
+            'package_id' => $package?->id,
+            'batch_number' => trim($batchNumber),
+            'expires_at' => $expiresAt,
+            'received_quantity' => $quantity,
+            'remaining_quantity' => $quantity,
+            'unit_cost' => $lotUnitCost,
+            'receipt_token' => $receiptToken,
+            'received_by' => $actor->id,
+            'received_at' => now(),
+            'storage_zone' => $storageZone !== null && trim($storageZone) !== '' ? trim($storageZone) : null,
+            'purchase_order_item_id' => $purchaseOrderItemId,
+            'supplier_invoice_number' => $invoiceNumber,
+        ]);
+
+        InventoryLog::create([
+            'ingredient_id' => $ingredient->id,
+            'stock_lot_id' => $lot->id,
+            'user_id' => $actor->id,
+            'type' => 'stock_in',
+            'quantity' => $quantity,
+            'stock_before' => $before,
+            'stock_after' => $after,
+            'notes' => mb_substr($notes, 0, 500),
+        ]);
+
+        return [
+            'ingredient' => $ingredient,
+            'lot' => $lot,
+            'current_stock' => $before,
+            'package_quantity' => $quantity,
+            'expected_stock' => $after,
+        ];
+    }
+
     private function apply(
         Ingredient $ingredient,
         string $type,
@@ -714,6 +875,7 @@ final class InventoryService
         ?string $note,
         ?int $orderId = null,
         ?string $reason = null,
+        ?string $stage = null,
     ): array
     {
         $delta = match ($type) {
@@ -820,6 +982,7 @@ final class InventoryService
                 'stock_after' => $movementLot['stock_after'],
                 'notes' => $note !== null ? mb_substr($note, 0, 500) : null,
                 'reason' => $reason,
+                'stage' => $stage,
                 'cost_amount' => $type === 'waste' && $movementLot['unit_cost'] !== null
                     ? round($movementLot['quantity'] * (float) $movementLot['unit_cost'], 4)
                     : null,

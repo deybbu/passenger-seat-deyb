@@ -11,7 +11,7 @@ class InventoryLog extends Model
 {
     protected $fillable = [
         'ingredient_id', 'stock_lot_id', 'user_id', 'order_id', 'type', 'quantity', 'stock_before', 'stock_after', 'notes',
-        'reason', 'cost_amount',
+        'reason', 'cost_amount', 'stage',
     ];
 
     protected function casts(): array

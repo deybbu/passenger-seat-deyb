@@ -3,10 +3,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!form) return;
 
+    const adminRegister = form.dataset.adminRegister === 'true';
     const menu = JSON.parse(form.dataset.menuItems || '[]');
     const categories = ['All', ...JSON.parse(form.dataset.categories || '[]')];
     const cart = new Map();
-    const held = [];
+    const asHeldDraft = (draft) => ({
+        ...draft,
+        cart: new Map(Object.entries(draft.items || {}).map(([id, quantity]) => [Number(id), Number(quantity)])),
+        type: draft.type === 'take_out' ? 'Take-out' : 'Dine-in',
+        table: draft.table || '',
+        customer: draft.customer || '',
+    });
+    const held = adminRegister
+        ? JSON.parse(form.dataset.heldOrders || '[]').map(asHeldDraft)
+        : [];
+    let activeHeldId = adminRegister && form.dataset.oldHeldId
+        ? Number(form.dataset.oldHeldId)
+        : null;
     Object.entries(JSON.parse(form.dataset.oldItems || '{}')).forEach(([id, quantity]) => {
         const item = menu.find((candidate) => candidate.id === Number(id));
         const count = Number(quantity);
@@ -27,10 +40,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemById = (id) => menu.find((item) => item.id === Number(id));
     const toast = (message) => {
         const element = document.querySelector('#toast');
+        if (!element) return;
         element.textContent = message;
         element.classList.add('on');
         window.clearTimeout(toastTimer);
         toastTimer = window.setTimeout(() => element.classList.remove('on'), 2200);
+    };
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const postJson = async (url, body = {}, method = 'POST') => {
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: method === 'DELETE' ? undefined : JSON.stringify(body),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            const validationMessage = Object.values(data.errors || {}).flat()[0];
+            throw new Error(data.message || validationMessage || 'The request could not be completed.');
+        }
+        return data;
+    };
+    const heldDraftPayload = () => ({
+        items: Object.fromEntries(cart),
+        type: orderType === 'Dine-in' ? 'dine_in' : 'take_out',
+        table_number: document.querySelector('#tbl').value.trim(),
+        customer_name: document.querySelector('#cust').value.trim(),
+        discount_type: document.querySelector('#dtype').value,
+        discount_rate: document.querySelector('#disc').value,
+        discount_cardholder_name: document.querySelector('#idName').value.trim(),
+        discount_id_number: document.querySelector('#idNo').value.trim(),
+        discount_tin: document.querySelector('#tin').value.trim(),
+        payment_method: paymentMethod.toLocaleLowerCase(),
+        held_order_id: document.querySelector('[data-held-order-id]').value || null,
+    });
+    const updateHeldDraft = (draft) => {
+        const normalized = asHeldDraft(draft);
+        const index = held.findIndex((item) => Number(item.id) === Number(normalized.id));
+        if (index < 0) held.push(normalized);
+        else held[index] = normalized;
+        return normalized;
     };
 
     const totals = () => {
@@ -96,18 +149,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderHeld = () => {
         const box = document.querySelector('#heldBox');
-        box.classList.toggle('hide', held.length === 0);
-        box.innerHTML = held.length
-            ? `<div class="mute" style="font-weight:600;margin-bottom:4px">On hold (${held.length})</div>`
-                + held.map((draft, index) => {
+        const visibleHeld = adminRegister
+            ? held.filter((draft) => Number(draft.id) !== activeHeldId)
+            : held;
+        box.classList.toggle('hide', visibleHeld.length === 0);
+        box.innerHTML = visibleHeld.length
+            ? `${adminRegister
+                ? `<div class="held-heading">On hold (${visibleHeld.length})</div>`
+                : `<div class="mute" style="font-weight:600;margin-bottom:4px">On hold (${visibleHeld.length})</div>`}`
+                + visibleHeld.map((draft, index) => {
                     const quantity = [...draft.cart.values()].reduce((sum, value) => sum + value, 0);
-                    const subtotal = [...draft.cart].reduce((sum, [id, value]) => sum + itemById(id).price * value, 0);
+                    const subtotal = [...draft.cart].reduce((sum, [id, value]) => {
+                        const item = itemById(id);
+                        return sum + (item ? item.price * value : 0);
+                    }, 0);
+                    const key = adminRegister ? draft.id : index;
+                    const wrapperClass = adminRegister ? 'held-order' : 'ord';
+                    const wrapperStyle = adminRegister
+                        ? ''
+                        : ' style="display:flex;justify-content:space-between;align-items:center;gap:6px"';
+                    const actionsClass = adminRegister ? 'held-order-actions' : '';
+                    const resumeClass = adminRegister ? 'btn red' : 'btn sm red';
+                    const discardClass = adminRegister ? 'btn' : 'btn sm';
 
-                    return `<div class="ord" style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+                    return `<div class="${wrapperClass}"${wrapperStyle}>
                         <span>${escapeHtml(draft.customer || `Hold ${index + 1}`)}${draft.table ? ` · Table ${escapeHtml(draft.table)}` : ''}
                             <br><small class="mute">${quantity} items · ${money(subtotal)}</small></span>
-                        <span><button class="btn sm red" type="button" data-resume="${index}">Resume</button>
-                        <button class="btn sm" type="button" data-discard="${index}">Discard</button></span>
+                        <span class="${actionsClass}"><button class="${resumeClass}" type="button" data-resume="${key}">Resume</button>
+                        <button class="${discardClass}" type="button" data-discard="${key}">Discard</button></span>
                     </div>`;
                 }).join('')
             : '';
@@ -200,9 +269,58 @@ document.addEventListener('DOMContentLoaded', () => {
         else cart.set(id, next);
         renderCart();
     });
-    document.querySelector('#heldBox').addEventListener('click', (event) => {
+    document.querySelector('#heldBox').addEventListener('click', async (event) => {
         const discard = event.target.closest('[data-discard]');
         const resume = event.target.closest('[data-resume]');
+        if (adminRegister && (discard || resume)) {
+            try {
+                if (discard) {
+                    const id = Number(discard.dataset.discard);
+                    await postJson(form.dataset.discardUrl.replace('__ID__', String(id)), {}, 'DELETE');
+                    const index = held.findIndex((draft) => Number(draft.id) === id);
+                    if (index >= 0) held.splice(index, 1);
+                    renderCart();
+                    toast('Held order discarded.');
+                } else {
+                    if (cart.size) {
+                        const saved = await postJson(form.dataset.holdUrl, heldDraftPayload());
+                        updateHeldDraft(saved.order);
+                        activeHeldId = null;
+                        document.querySelector('[data-held-order-id]').value = '';
+                    }
+                    const id = Number(resume.dataset.resume);
+                    const draft = await postJson(form.dataset.resumeUrl.replace('__ID__', String(id)));
+                    cart.clear();
+                    Object.entries(draft.items).forEach(([itemId, quantity]) => {
+                        const item = itemById(itemId);
+                        if (item && Number.isInteger(Number(quantity)) && Number(quantity) > 0) {
+                            cart.set(item.id, Math.min(20, Number(quantity)));
+                        }
+                    });
+                    orderType = draft.type === 'take_out' ? 'Take-out' : 'Dine-in';
+                    paymentMethod = ({ cash: 'Cash', gcash: 'GCash', card: 'Card' })[draft.payment_method] || 'Cash';
+                    document.querySelector('#order-type').value = draft.type;
+                    document.querySelector('#payment-method').value = draft.payment_method;
+                    document.querySelector('[data-held-order-id]').value = String(draft.id);
+                    document.querySelector('#tbl').value = draft.table;
+                    document.querySelector('#cust').value = draft.customer;
+                    document.querySelector('#dtype').value = draft.discount_type;
+                    document.querySelector('#disc').value = draft.discount_rate;
+                    document.querySelector('#idName').value = draft.discount_cardholder_name;
+                    document.querySelector('#idNo').value = draft.discount_id_number;
+                    document.querySelector('#tin').value = draft.discount_tin;
+                    document.querySelector('#tend').value = '';
+                    activeHeldId = id;
+                    document.querySelectorAll('#otype [data-o]').forEach((button) => button.classList.toggle('on', button.dataset.o === orderType));
+                    document.querySelectorAll('#pay [data-p]').forEach((button) => button.classList.toggle('on', button.dataset.p === paymentMethod));
+                    renderCart();
+                    toast('Held order resumed.');
+                }
+            } catch (error) {
+                toast(error.message);
+            }
+            return;
+        }
         if (discard) {
             held.splice(Number(discard.dataset.discard), 1);
             renderCart();
@@ -252,16 +370,36 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('#clear').addEventListener('click', () => {
         cart.clear();
         form.reset();
+        activeHeldId = null;
+        if (adminRegister) document.querySelector('[data-held-order-id]').value = '';
         orderType = 'Dine-in';
         paymentMethod = 'Cash';
         document.querySelector('#order-type').value = 'dine_in';
         document.querySelector('#payment-method').value = 'cash';
         document.querySelectorAll('#otype [data-o]').forEach((button) => button.classList.toggle('on', button.dataset.o === orderType));
         document.querySelectorAll('#pay [data-p]').forEach((button) => button.classList.toggle('on', button.dataset.p === paymentMethod));
+        renderHeld();
         renderCart();
     });
-    document.querySelector('#hold').addEventListener('click', () => {
+    document.querySelector('#hold').addEventListener('click', async () => {
         if (!cart.size) return;
+        if (adminRegister) {
+            try {
+                const response = await postJson(form.dataset.holdUrl, heldDraftPayload());
+                updateHeldDraft(response.order);
+                activeHeldId = null;
+                document.querySelector('[data-held-order-id]').value = '';
+                cart.clear();
+                document.querySelector('#tend').value = '';
+                document.querySelector('#tbl').value = '';
+                document.querySelector('#cust').value = '';
+                renderCart();
+                toast('Order held.');
+            } catch (error) {
+                toast(error.message);
+            }
+            return;
+        }
         held.push({
             cart: new Map(cart),
             type: orderType,
@@ -274,10 +412,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('#cust').value = '';
         renderCart();
     });
-    document.querySelector('#phBtn').addEventListener('click', () => {
+    document.querySelector('#phBtn')?.addEventListener('click', () => {
         toast('Edit menu items in Menu Management.');
     });
-    document.querySelector('#cuBtn').addEventListener('click', () => {
+    document.querySelector('#cuBtn')?.addEventListener('click', () => {
         toast('Custom items are not saved to the menu.');
     });
     renderCart();

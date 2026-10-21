@@ -45,7 +45,7 @@ class LoginController extends Controller
             return redirect()->route('staff.login')->withErrors(['email' => 'This account has no staff role yet. Ask an admin.']);
         }
 
-        return redirect()->intended($user->homeUrl());
+        return redirect($user->homeUrl());
     }
 
     public function destroy(Request $request): RedirectResponse

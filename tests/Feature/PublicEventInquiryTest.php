@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\EventInquiry;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -71,6 +72,31 @@ class PublicEventInquiryTest extends TestCase
             ->assertSee('Pending review')
             ->assertSee($inquiry->reference)
             ->assertSee('Your date is not confirmed yet');
+    }
+
+    public function test_event_date_cutoff_uses_the_philippine_date_after_midnight(): void
+    {
+        $this->assertSame('Asia/Manila', config('app.timezone'));
+
+        Carbon::setTestNow(
+            Carbon::parse('2026-10-17 16:17:00', 'UTC')->setTimezone('Asia/Manila')
+        );
+
+        try {
+            $this->get(route('events'))
+                ->assertViewHas('today', '2026-10-18');
+            $this->get(route('home'))
+                ->assertViewHas('today', '2026-10-18');
+
+            $this->from(route('events'))
+                ->post(route('events.store'), $this->validInquiry('2026-10-17'))
+                ->assertRedirect(route('events'))
+                ->assertSessionHasErrors('event_date');
+
+            $this->assertDatabaseCount('event_inquiries', 0);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_homepage_shows_calendar_and_contact_form(): void

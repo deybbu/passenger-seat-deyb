@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminAlertRule;
 use App\Services\AdminAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,11 +17,20 @@ class NotificationController extends Controller
     public function index(Request $request, AdminAlertService $alerts): View
     {
         $items = $alerts->all($request);
+        $rules = AdminAlertRule::query()->orderBy('id')->get();
 
         return view('admin.notifications', [
             'alerts' => $items,
             'unreadCount' => $items->where('unread', true)->count(),
+            'rules' => $rules,
         ]);
+    }
+
+    public function toggleRule(AdminAlertRule $rule): RedirectResponse
+    {
+        $rule->update(['is_enabled' => ! $rule->is_enabled]);
+
+        return back()->with('status', 'Alert rule updated.');
     }
 
     public function markRead(Request $request, AdminAlertService $alerts): JsonResponse|RedirectResponse

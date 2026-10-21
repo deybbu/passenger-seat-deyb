@@ -18,10 +18,11 @@
             <button type="button" role="tab" data-url="{{ route('staff.orders.create') }}" aria-selected="{{ $activePosTab === 'register' ? 'true' : 'false' }}">Register</button>
             <button type="button" role="tab" data-url="{{ route('staff.pos.orders') }}" aria-selected="{{ $activePosTab === 'orders' ? 'true' : 'false' }}">Orders <span class="badge b-p">{{ $pendingOrderCount }}</span></button>
             <button type="button" role="tab" data-url="{{ route('staff.pos.analytics') }}" aria-selected="{{ $activePosTab === 'sales' ? 'true' : 'false' }}">Sales</button>
-            <button type="button" role="tab" data-url="{{ route('staff.pos.index') }}" aria-selected="{{ $activePosTab === 'billing' ? 'true' : 'false' }}">Billing <span class="badge b-p">{{ $unpaidOrderCount }}</span></button>
+            <button type="button" role="tab" data-url="{{ route('staff.pos.index') }}" aria-selected="{{ $activePosTab === 'billing' ? 'true' : 'false' }}">Billing <span class="badge b-p" data-bill-request-count @if(($billRequestCount ?? 0) < 1) hidden @endif>{{ $billRequestCount ?? 0 }}</span></button>
             <button type="button" role="tab" data-url="{{ route('staff.pos.table-qr') }}" aria-selected="{{ $activePosTab === 'table-qr' ? 'true' : 'false' }}">Table QR</button>
         </nav>
         <div class="top-actions">
+            @include('pos.partials.bill-request-alerts')
             <time class="clock" id="clock"></time>
             <x-theme-toggle class="btn sm" />
             <form method="POST" action="{{ route('staff.logout') }}">

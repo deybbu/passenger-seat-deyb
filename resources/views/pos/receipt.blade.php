@@ -6,9 +6,20 @@
     @php
         $subtotal = (float) ($order->subtotal ?? $order->items->sum(fn ($item) => (float) $item->price * (int) $item->quantity));
         $isVatExemptDiscount = in_array($order->discount_type, ['SC', 'PWD'], true);
-        $vatExclusive = $isVatExemptDiscount ? round($subtotal / 1.12, 2) : $subtotal;
-        $vatExemption = $isVatExemptDiscount ? round($subtotal - $vatExclusive, 2) : 0;
-        $vatIncluded = $isVatExemptDiscount ? 0 : round((float) $order->total_amount * 12 / 112, 2);
+        $isTableQr = $order->source === 'table_qr';
+        $isSessionTableQr = $order->table_session_id !== null;
+        $vatExclusive = ! $isSessionTableQr && ($isTableQr || ! $isVatExemptDiscount)
+            ? $subtotal
+            : round($subtotal / 1.12, 2);
+        $vatExemption = $isVatExemptDiscount && (! $isTableQr || $isSessionTableQr)
+            ? ($isSessionTableQr
+                ? (float) ($order->vat_exemption ?? round($subtotal - $vatExclusive, 2))
+                : round($subtotal - $vatExclusive, 2))
+            : 0;
+        $vatIncluded = $isTableQr && ! $isSessionTableQr
+            ? (float) ($order->vat_amount ?? 0)
+            : ($isVatExemptDiscount ? 0 : round((float) $order->total_amount * 12 / 112, 2));
+        $vatLabel = $isTableQr && ! $isSessionTableQr ? 'VAT (12%)' : 'VAT (included)';
         $cashChange = max(0, (float) $order->amount_tendered - (float) $order->total_amount);
         $discountLabel = match ($order->discount_type) {
             'SC' => 'Senior Citizen (20%)',
@@ -64,13 +75,16 @@
         @else
             <div class="pos-receipt-row"><span>Discount</span><span>₱0.00</span></div>
         @endif
-        <div class="pos-receipt-row"><span>VAT (included)</span><span>₱{{ number_format($vatIncluded, 2) }}</span></div>
+        <div class="pos-receipt-row"><span>{{ $vatLabel }}</span><span>₱{{ number_format($vatIncluded, 2) }}</span></div>
         <div class="pos-receipt-row pos-receipt-total"><strong>TOTAL</strong><strong>₱{{ number_format((float) $order->total_amount, 2) }}</strong></div>
         <hr>
 
         <div class="pos-receipt-row"><span>Payment status</span><strong>{{ str($order->payment_status)->headline() }}</strong></div>
         @if ($order->isPaid())
             <div class="pos-receipt-row"><span>Payment method</span><span>{{ strtoupper($order->payment_method) }}</span></div>
+            @if ($order->payment_reference)
+                <div class="pos-receipt-row"><span>Bill reference</span><span>{{ $order->payment_reference }}</span></div>
+            @endif
             @if ($order->payment_method === 'cash')
                 <div class="pos-receipt-row"><span>Cash tendered</span><span>₱{{ number_format((float) $order->amount_tendered, 2) }}</span></div>
                 <div class="pos-receipt-row"><span>Change</span><span>₱{{ number_format($cashChange, 2) }}</span></div>

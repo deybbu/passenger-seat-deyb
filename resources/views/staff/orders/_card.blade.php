@@ -17,7 +17,15 @@
 
     <ul class="mt-2 space-y-0.5 text-sm">
         @foreach ($order->items as $item)
-            <li><span class="font-semibold">{{ $item->quantity }}×</span> {{ $item->name }}</li>
+            <li>
+                <span class="font-semibold">{{ $item->quantity }}×</span> {{ $item->name }}
+                @if ($item->variant_name_snapshot)
+                    <span class="text-gray-600">· {{ $item->variant_name_snapshot }}</span>
+                @endif
+                @if ($item->modifier_snapshot)
+                    <span class="text-gray-600">· {{ collect($item->modifier_snapshot)->pluck('name')->filter()->join(', ') }}</span>
+                @endif
+            </li>
         @endforeach
     </ul>
 

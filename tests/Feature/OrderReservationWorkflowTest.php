@@ -11,6 +11,7 @@ use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\PreparationRecipe;
+use App\Models\PurchaseOrder;
 use App\Models\TableSession;
 use App\Models\User;
 use App\Services\InventoryService;
@@ -735,10 +736,10 @@ class OrderReservationWorkflowTest extends TestCase
             ->post(route('admin.waste.store'), [
                 'ingredient_id' => $this->ingredient->id,
                 'quantity' => 2,
-                'reason' => 'Pre-Cook Spoilage',
-                'notes' => 'Pending order reservation',
+                'stage' => 'Prep / production',
+                'reason' => 'Expired',
             ])
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('quantity');
         $this->assertDatabaseMissing('inventory_logs', [
             'ingredient_id' => $this->ingredient->id,
             'type' => 'waste',
@@ -752,8 +753,8 @@ class OrderReservationWorkflowTest extends TestCase
             ->post(route('admin.waste.store'), [
                 'ingredient_id' => $this->ingredient->id,
                 'quantity' => 2,
-                'reason' => 'Other',
-                'notes' => 'Damaged ingredient',
+                'stage' => 'Pre-consumer spoilage',
+                'reason' => 'Dropped/Spilled',
             ])
             ->assertSessionHas('status');
         $this->assertSame(8.0, (float) $this->ingredient->fresh()->current_stock);
@@ -761,14 +762,54 @@ class OrderReservationWorkflowTest extends TestCase
             'ingredient_id' => $this->ingredient->id,
             'type' => 'waste',
             'quantity' => -2,
+            'stage' => 'Pre-consumer spoilage',
             'stock_before' => 10,
             'stock_after' => 8,
         ]);
 
-        $this->post(route('admin.barcode.receive'), [
-            'code' => 'Rice',
+        InventoryPackage::create([
+            'ingredient_id' => $this->ingredient->id,
+            'barcode' => 'RICE-001',
+            'label' => 'Rice package',
+            'package_quantity' => 2,
+            'is_active' => true,
+        ]);
+        $purchaseOrder = PurchaseOrder::create([
+            'reference' => 'PO-WORKFLOW-001',
+            'supplier_name' => 'Workflow supplier',
+            'status' => 'open',
+            'created_by' => $admin->id,
+            'ordered_at' => now(),
+        ]);
+        $orderItem = $purchaseOrder->items()->create([
+            'ingredient_id' => $this->ingredient->id,
+            'ordered_quantity' => 2,
+            'received_quantity' => 0,
+        ]);
+        $this->postJson(route('admin.barcode.lookup'), ['barcode' => 'RICE-001'])
+            ->assertOk()
+            ->assertJsonPath('purchase_order.reference', 'PO-WORKFLOW-001');
+        $this->assertSame(8.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->postJson(route('admin.barcode.receive'), [
+            'barcode' => 'RICE-001',
+            'purchase_order_item_id' => $orderItem->id,
+            'quantity' => 3,
+            'invoice_number' => 'INV-OVER-DELIVERY',
+            'batch_number' => 'BATCH-OVER-DELIVERY',
+            'expires_at' => today()->addMonth()->toDateString(),
+            'receipt_token' => (string) Str::uuid(),
+        ])->assertUnprocessable();
+        $this->assertSame(8.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->postJson(route('admin.barcode.receive'), [
+            'barcode' => 'RICE-001',
+            'purchase_order_item_id' => $orderItem->id,
             'quantity' => 2,
-        ])->assertSessionHas('status');
+            'invoice_number' => 'INV-WORKFLOW-001',
+            'batch_number' => 'BATCH-WORKFLOW-001',
+            'expires_at' => today()->addMonth()->toDateString(),
+            'storage_zone' => 'Dry Pantry',
+            'receipt_token' => (string) Str::uuid(),
+        ])->assertCreated();
         $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
         $this->assertDatabaseHas('inventory_logs', [
             'ingredient_id' => $this->ingredient->id,
@@ -776,6 +817,65 @@ class OrderReservationWorkflowTest extends TestCase
             'quantity' => 2,
             'stock_before' => 8,
             'stock_after' => 10,
+        ]);
+    }
+
+    public function test_admin_can_generate_a_purchase_order_and_close_a_short_delivery(): void
+    {
+        $admin = User::create([
+            'name' => 'Inventory Admin',
+            'email' => 'purchase-orders@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
+        $this->ingredient->update(['current_stock' => 0]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.purchase-orders.store', $this->ingredient), [
+                'supplier_name' => 'Test supplier',
+            ])
+            ->assertRedirect(route('admin.purchase-orders'));
+
+        $purchaseOrder = PurchaseOrder::query()->firstOrFail();
+        $orderItem = $purchaseOrder->items()->firstOrFail();
+        $this->assertSame('open', $purchaseOrder->status);
+        $this->assertSame(2.0, (float) $orderItem->ordered_quantity);
+
+        InventoryPackage::create([
+            'ingredient_id' => $this->ingredient->id,
+            'barcode' => 'RICE-SHORT',
+            'label' => 'Rice package',
+            'package_quantity' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.barcode.lookup'), ['barcode' => 'RICE-SHORT'])
+            ->assertOk()
+            ->assertJsonPath('purchase_order.remaining_quantity', 2);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.barcode.receive'), [
+                'barcode' => 'RICE-SHORT',
+                'purchase_order_item_id' => $orderItem->id,
+                'quantity' => 1,
+                'unit_cost' => 4.5,
+                'invoice_number' => 'INV-SHORT-001',
+                'batch_number' => 'BATCH-SHORT-001',
+                'expires_at' => today()->addMonth()->toDateString(),
+                'storage_zone' => 'Dry Pantry',
+                'receipt_token' => (string) Str::uuid(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('remaining_quantity', 1);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.purchase-orders.close-short', $orderItem))
+            ->assertSessionHas('status');
+        $this->assertSame('closed_short', $purchaseOrder->fresh()->status);
+        $this->assertDatabaseHas('activity_logs', [
+            'module' => 'Receiving',
+            'subject_id' => $purchaseOrder->id,
         ]);
     }
 
@@ -1190,8 +1290,8 @@ class OrderReservationWorkflowTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.waste'))
             ->assertOk()
-            ->assertSee('Reason and details')
-            ->assertSee('Estimated cost');
+            ->assertSee('Cost lost')
+            ->assertSee('Near expiry');
 
         $this->actingAs($admin)
             ->get(route('inventory.index'))
@@ -1433,6 +1533,7 @@ class OrderReservationWorkflowTest extends TestCase
             $table->string('discount_tin')->nullable();
             $table->timestamp('paid_at')->nullable();
             $table->foreignId('cashier_id')->nullable();
+            $table->timestamp('held_at')->nullable()->index();
             $table->timestamps();
         });
 
@@ -1500,6 +1601,7 @@ class OrderReservationWorkflowTest extends TestCase
             $table->decimal('stock_after', 10, 3)->nullable();
             $table->string('notes')->nullable();
             $table->string('reason', 80)->nullable();
+            $table->string('stage', 40)->nullable();
             $table->decimal('cost_amount', 12, 4)->nullable();
             $table->timestamps();
         });
@@ -1525,8 +1627,45 @@ class OrderReservationWorkflowTest extends TestCase
             $table->decimal('unit_cost', 12, 4)->nullable();
             $table->string('receipt_token', 64)->unique();
             $table->foreignId('received_by')->nullable();
+            $table->foreignId('purchase_order_item_id')->nullable();
+            $table->string('supplier_invoice_number', 80)->nullable();
             $table->timestamp('received_at')->nullable();
             $table->string('storage_zone', 80)->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('purchase_orders', function ($table): void {
+            $table->id();
+            $table->string('reference', 40)->unique();
+            $table->string('supplier_name', 150);
+            $table->string('status', 24)->default('open');
+            $table->string('invoice_number', 80)->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamp('ordered_at')->nullable();
+            $table->date('expected_at')->nullable();
+            $table->timestamp('closed_at')->nullable();
+            $table->text('notes')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('purchase_order_items', function ($table): void {
+            $table->id();
+            $table->unsignedBigInteger('purchase_order_id');
+            $table->unsignedBigInteger('ingredient_id');
+            $table->decimal('ordered_quantity', 12, 3);
+            $table->decimal('received_quantity', 12, 3)->default(0);
+            $table->decimal('expected_unit_cost', 12, 4)->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('activity_logs', function ($table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('action', 255);
+            $table->string('module', 80);
+            $table->string('subject_type')->nullable();
+            $table->unsignedBigInteger('subject_id')->nullable();
+            $table->text('metadata')->nullable();
             $table->timestamps();
         });
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,30 +12,42 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Order extends Model
 {
     protected $fillable = [
-        'reference_number', 'type', 'table_number', 'table_session_id', 'submission_token',
+        'reference_number', 'type', 'table_number', 'table_id', 'table_session_id', 'batch_number',
+        'submission_token',
+        'source',
         'customer_name', 'customer_phone', 'special_instructions',
-        'total_amount', 'status', 'payment_status', 'payment_method', 'cashier_id', 'paid_at',
-        'payment_reference', 'amount_tendered', 'order_type', 'subtotal', 'total',
+        'total_amount', 'vat_amount', 'status', 'payment_status', 'payment_method', 'cashier_id', 'paid_at',
+        'payment_reference', 'amount_tendered', 'order_type', 'subtotal', 'total', 'vat_exemption',
         'discount_type', 'discount_rate', 'discount_amount', 'discount_cardholder_name',
         'discount_id_number', 'discount_tin',
+        'held_at',
     ];
 
     protected function casts(): array
     {
         return [
             'total_amount' => 'decimal:2',
+            'vat_amount' => 'decimal:2',
+            'vat_exemption' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'total' => 'decimal:2',
             'discount_rate' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'amount_tendered' => 'decimal:2',
+            'batch_number' => 'integer',
             'paid_at' => 'datetime',
+            'held_at' => 'datetime',
         ];
     }
 
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function scopeNotHeld(Builder $query): Builder
+    {
+        return $query->whereNull('held_at');
     }
 
     public function creator(): BelongsTo
@@ -60,6 +73,11 @@ class Order extends Model
     public function tableSession(): BelongsTo
     {
         return $this->belongsTo(TableSession::class);
+    }
+
+    public function restaurantTable(): BelongsTo
+    {
+        return $this->belongsTo(RestaurantTable::class, 'table_id');
     }
 
     public function getTotalAmountAttribute(): mixed

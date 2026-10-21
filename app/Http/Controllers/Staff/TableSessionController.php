@@ -8,18 +8,21 @@ use App\Http\Controllers\Controller;
 use App\Models\Ingredient;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\RestaurantTable;
 use App\Models\TableSession;
+use App\Services\TableSessionStatusService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class TableSessionController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, TableSessionStatusService $tableSessionStatuses): View
     {
         abort_unless($request->user()->hasRole('cashier'), 403);
 
@@ -28,17 +31,24 @@ class TableSessionController extends Controller
             ->whereNull('closed_at')
             ->orderBy('table_number')
             ->get();
+        $tables = Schema::hasTable('restaurant_tables')
+            ? RestaurantTable::query()->orderBy('table_number')->get()
+            : collect();
+        $tableStatuses = $tableSessionStatuses->forTables($tables)->values();
 
-        return view('staff.tables.index', compact('sessions'));
+        return view('staff.tables.index', compact('sessions', 'tableStatuses'));
     }
 
-    public function posQr(): View
+    public function posQr(TableSessionStatusService $tableSessionStatuses): View
     {
         $tableSessions = TableSession::query()
             ->whereNull('closed_at')
-            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->orderBy('table_number')
             ->get(['id', 'table_number', 'public_token']);
+        $tables = Schema::hasTable('restaurant_tables')
+            ? RestaurantTable::query()->orderBy('table_number')->get()
+            : collect();
+        $tableStatuses = $tableSessionStatuses->forTables($tables)->values();
 
         $menuItems = MenuItem::query()
             ->with(['category:id,name'])
@@ -74,6 +84,7 @@ class TableSessionController extends Controller
 
         return view('pos.table-qr', [
             'tableSessions' => $tableSessions,
+            'tableStatuses' => $tableStatuses,
             'menuItems' => $menuItems,
             'submissionToken' => (string) Str::uuid(),
         ]);
@@ -92,15 +103,16 @@ class TableSessionController extends Controller
 
         try {
             $session = DB::transaction(function () use ($request, $table, $data): TableSession {
-                TableSession::query()
-                    ->where('table_number', $table)
-                    ->whereNull('closed_at')
-                    ->where('expires_at', '<=', now())
-                    ->update([
-                        'closed_at' => now(),
-                        'active_table_number' => null,
-                        'closed_by' => $request->user()->id,
-                    ]);
+                if (Schema::hasTable('restaurant_tables')) {
+                    RestaurantTable::query()->firstOrCreate(
+                        ['table_number' => $table],
+                        [
+                            'name' => 'Table '.$table,
+                            'is_enabled' => true,
+                            'qr_token' => RestaurantTable::generateUniqueQrToken(),
+                        ],
+                    );
+                }
 
                 return TableSession::create([
                     'table_number' => $table,
@@ -109,7 +121,6 @@ class TableSessionController extends Controller
                     'guest_count' => $data['guest_count'],
                     'opened_by' => $request->user()->id,
                     'opened_at' => now(),
-                    'expires_at' => now()->addMinutes(180),
                 ]);
             });
         } catch (UniqueConstraintViolationException $exception) {
@@ -123,29 +134,14 @@ class TableSessionController extends Controller
         return back()->with('status', "Table {$table} is open. QR link: " . route('customer.qr.show', ['table' => $session->table_number]));
     }
 
-    public function extend(Request $request, TableSession $tableSession): RedirectResponse
-    {
-        abort_unless($request->user()->hasRole('cashier'), 403);
-        $session = DB::transaction(function () use ($tableSession): TableSession {
-            $locked = TableSession::query()->lockForUpdate()->findOrFail($tableSession->id);
-            abort_if($locked->closed_at !== null, 409, 'This table session is already closed.');
-
-            $base = $locked->expires_at && $locked->expires_at->isFuture()
-                ? $locked->expires_at
-                : now();
-            $locked->update(['expires_at' => $base->addMinutes(30)]);
-
-            return $locked;
-        });
-
-        return back()->with('status', "Table {$session->table_number} QR access was extended by 30 minutes.");
-    }
-
     public function requestBill(Request $request, TableSession $tableSession): RedirectResponse
     {
         abort_unless($request->user()->hasRole('cashier'), 403);
         abort_if($tableSession->closed_at !== null, 409, 'This table session is already closed.');
-        $tableSession->update(['bill_requested_at' => now()]);
+        $tableSession->update([
+            'status' => 'bill_requested',
+            'bill_requested_at' => now(),
+        ]);
 
         return back()->with('status', "Bill requested for table {$tableSession->table_number}.");
     }

@@ -7,6 +7,10 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Models\MenuItem;
+use App\Models\MenuItemVariant;
+use App\Models\MenuModifierOption;
+use App\Models\RestaurantTable;
+use App\Models\ActivityLog;
 use App\Models\TableSession;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -19,13 +23,15 @@ use Illuminate\Support\Facades\Schema;
  */
 final class OrderService
 {
-    public function __construct(private readonly InventoryService $inventory)
-    {
+    public function __construct(
+        private readonly InventoryService $inventory,
+        private readonly TableSessionBillCalculator $tableSessionBills,
+    ) {
     }
 
     /**
-     * @param  array{type:string, table_number:?string, customer_name?:?string, customer_phone?:?string, special_instructions:?string, table_session_id?:?int, submission_token?:?string}  $data
-     * @param  Collection<int, object{item: \App\Models\MenuItem, qty: int, line_total: float}>  $lines
+     * @param  array<string, mixed>  $data
+     * @param  Collection<int, object{item?: \App\Models\MenuItem, item_id?: int, qty: int, variant_id?: ?int, modifier_option_ids?: array<int, int>}>  $lines
      *
      * @throws \DomainException when stock or availability fails
      */
@@ -36,23 +42,122 @@ final class OrderService
         }
 
         return DB::transaction(function () use ($data, $lines, $staff) {
-            $lockedLines = $lines->sortBy(fn ($line) => $line->item->id)->map(function ($line) {
-                $item = MenuItem::query()
-                    ->with('ingredients')
-                    ->whereKey($line->item->id)
+            $isTableQr = ($data['source'] ?? null) === 'table_qr';
+            $table = null;
+            $tableSession = null;
+            $batchNumber = null;
+            if ($isTableQr) {
+                $table = RestaurantTable::query()
+                    ->whereKey($data['table_id'] ?? 0)
+                    ->where('qr_token', $data['table_token'] ?? '')
+                    ->where('is_enabled', true)
                     ->lockForUpdate()
                     ->first();
 
-                if ($item === null || ! $item->isOrderable()) {
-                    throw new \DomainException(($line->item->name ?? 'A selected dish') . ' is no longer available.');
+                if ($table === null) {
+                    throw new \DomainException("This QR code isn't valid.");
+                }
+
+                $data['table_number'] = $table->table_number;
+
+                $tableSession = TableSession::query()
+                    ->where('table_id', $table->id)
+                    ->whereIn('status', ['open', 'bill_requested'])
+                    ->whereNull('closed_at')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($tableSession?->status === 'bill_requested' || $tableSession?->bill_requested_at !== null) {
+                    throw new \DomainException(
+                        'A bill has already been requested for this table. Cancel the request before ordering again.',
+                    );
+                }
+            }
+
+            $lockedLines = $lines->sortBy(
+                fn ($line) => $line->item_id ?? $line->item->id,
+            )->map(function ($line) use ($isTableQr) {
+                $sourceItem = $line->item ?? null;
+                $itemId = (int) ($line->item_id ?? $sourceItem?->id ?? 0);
+                $item = MenuItem::query()
+                    ->with(['category', 'ingredients'])
+                    ->whereKey($itemId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($item === null || ! $item->isOrderable()
+                    || ($isTableQr && ($item->archived_at !== null
+                        || ($item->category !== null && ! $item->category->is_active)))) {
+                    throw new \DomainException('One or more selected dishes are no longer available.');
                 }
 
                 $quantity = (int) $line->qty;
+                $variant = null;
+                $hasVariants = $isTableQr && $item->variants()->exists();
+                if (isset($line->variant_id)) {
+                    $variant = MenuItemVariant::query()
+                        ->whereKey($line->variant_id)
+                        ->where('menu_item_id', $item->id)
+                        ->where('is_active', true)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($variant === null) {
+                        throw new \DomainException('A selected size is no longer available.');
+                    }
+                } elseif ($hasVariants) {
+                    throw new \DomainException('Choose an available size for each selected dish.');
+                }
+
+                $modifierOptionIds = array_values(array_unique(array_map(
+                    'intval',
+                    $line->modifier_option_ids ?? [],
+                )));
+                $modifierOptions = collect();
+                if ($modifierOptionIds !== []) {
+                    $modifierOptions = MenuModifierOption::query()
+                        ->with('group')
+                        ->whereIn('id', $modifierOptionIds)
+                        ->where('is_active', true)
+                        ->whereHas('group', fn ($group) => $group->where('menu_item_id', $item->id))
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($modifierOptions->count() !== count($modifierOptionIds)) {
+                        throw new \DomainException('One or more selected options are no longer available.');
+                    }
+                }
+
+                if ($isTableQr) {
+                    $selectedGroupIds = $modifierOptions->pluck('menu_modifier_group_id')->unique();
+                    $missingRequiredGroup = $item->modifierGroups()
+                        ->where('is_required', true)
+                        ->whereNotIn('id', $selectedGroupIds)
+                        ->exists();
+                    if ($missingRequiredGroup) {
+                        throw new \DomainException('Choose an option from each required group.');
+                    }
+                }
+
+                $unitPrice = round(
+                    (float) ($variant?->price ?? $item->price)
+                        + (float) $modifierOptions->sum('price_delta'),
+                    2,
+                );
+                $modifierSnapshot = $modifierOptions->map(fn (MenuModifierOption $option): array => [
+                    'id' => (int) $option->id,
+                    'group' => $option->group->name,
+                    'name' => $option->name,
+                    'price_delta' => (float) $option->price_delta,
+                ])->values()->all();
 
                 return (object) [
                     'item' => $item,
+                    'variant' => $variant,
+                    'modifier_snapshot' => $modifierSnapshot,
                     'qty' => $quantity,
-                    'line_total' => round((float) $item->price * $quantity, 2),
+                    'unit_price' => $unitPrice,
+                    'line_total' => round($unitPrice * $quantity, 2),
                 ];
             })->values();
 
@@ -60,19 +165,41 @@ final class OrderService
                 throw new \DomainException('The order is empty.');
             }
 
-            if (isset($data['table_session_id'])) {
+            if (! $isTableQr && isset($data['table_session_id'])) {
                 $tableSession = TableSession::query()
                     ->whereKey($data['table_session_id'])
                     ->whereNull('closed_at')
-                    ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                     ->lockForUpdate()
                     ->first();
 
                 if ($tableSession === null || $tableSession->table_number !== (string) $data['table_number']) {
                     throw new \DomainException('This table session is no longer open. Please ask staff for help.');
                 }
+                if ($tableSession->status === 'bill_requested' || $tableSession->bill_requested_at !== null) {
+                    throw new \DomainException(
+                        'A bill has already been requested for this table. Cancel the request before ordering again.',
+                    );
+                }
             }
 
+            if ($isTableQr && $tableSession === null) {
+                $tableSession = TableSession::query()->create([
+                    'table_number' => $table->table_number,
+                    'table_id' => $table->id,
+                    'public_token' => \Illuminate\Support\Str::random(64),
+                    'active_table_number' => $table->table_number,
+                    'status' => 'open',
+                    'opened_at' => now(),
+                ]);
+            }
+
+            if ($tableSession !== null) {
+                $batchNumber = (int) $tableSession->orders()->max('batch_number') + 1;
+            }
+
+            $subtotal = round((float) $lockedLines->sum('line_total'), 2);
+            $vatAmount = $isTableQr ? round($subtotal * 12 / 112, 2) : 0.0;
+            $total = $subtotal;
             $orderAttributes = [
                 'reference_number' => $this->nextReference(),
                 'type' => $data['type'],
@@ -80,13 +207,22 @@ final class OrderService
                 'customer_name' => $data['customer_name'] ?? 'Table guest',
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'special_instructions' => $data['special_instructions'] ?? null,
-                'total_amount' => round((float) $lockedLines->sum('line_total'), 2),
+                'total_amount' => $total,
                 'status' => 'pending',
                 'payment_status' => 'unpaid',
             ];
 
-            if (isset($data['table_session_id']) && Schema::hasColumn('orders', 'table_session_id')) {
-                $orderAttributes['table_session_id'] = $data['table_session_id'];
+            if ($isTableQr && Schema::hasColumn('orders', 'table_id')) {
+                $orderAttributes['table_id'] = $table->id;
+            }
+            if ($isTableQr && Schema::hasColumn('orders', 'source')) {
+                $orderAttributes['source'] = 'table_qr';
+            }
+            if ($tableSession !== null && Schema::hasColumn('orders', 'table_session_id')) {
+                $orderAttributes['table_session_id'] = $tableSession->id;
+            }
+            if ($batchNumber !== null && Schema::hasColumn('orders', 'batch_number')) {
+                $orderAttributes['batch_number'] = $batchNumber;
             }
             if (isset($data['submission_token']) && Schema::hasColumn('orders', 'submission_token')) {
                 $orderAttributes['submission_token'] = $data['submission_token'];
@@ -98,10 +234,13 @@ final class OrderService
                 $orderAttributes['order_type'] = $data['type'];
             }
             if (Schema::hasColumn('orders', 'subtotal')) {
-                $orderAttributes['subtotal'] = round((float) $lockedLines->sum('line_total'), 2);
+                $orderAttributes['subtotal'] = $subtotal;
             }
             if (Schema::hasColumn('orders', 'total')) {
-                $orderAttributes['total'] = round((float) $lockedLines->sum('line_total'), 2);
+                $orderAttributes['total'] = $total;
+            }
+            if (Schema::hasColumn('orders', 'vat_amount')) {
+                $orderAttributes['vat_amount'] = $vatAmount;
             }
 
             $order = Order::create($orderAttributes);
@@ -118,9 +257,21 @@ final class OrderService
                     'menu_item_id' => $line->item->id,
                     'name' => $line->item->name,
                     'quantity' => $line->qty,
-                    'price' => $line->item->price,
+                    'price' => $line->unit_price,
                 ];
 
+                if (Schema::hasColumn('order_items', 'menu_item_variant_id')) {
+                    $itemAttributes['menu_item_variant_id'] = $line->variant?->id;
+                }
+                if (Schema::hasColumn('order_items', 'variant_name_snapshot')) {
+                    $itemAttributes['variant_name_snapshot'] = $line->variant?->name;
+                }
+                if (Schema::hasColumn('order_items', 'category_name_snapshot')) {
+                    $itemAttributes['category_name_snapshot'] = $line->item->category?->name;
+                }
+                if ($line->modifier_snapshot !== [] && Schema::hasColumn('order_items', 'modifier_snapshot')) {
+                    $itemAttributes['modifier_snapshot'] = $line->modifier_snapshot;
+                }
                 if (Schema::hasColumn('order_items', 'line_total')) {
                     $itemAttributes['line_total'] = round((float) $line->line_total, 2);
                 }
@@ -129,6 +280,26 @@ final class OrderService
             }
 
             $this->inventory->reserveForOrder($order, $lockedLines);
+
+            if ($isTableQr) {
+                ActivityLog::query()->create([
+                    'action' => 'Customer table QR order placed',
+                    'module' => 'orders',
+                    'subject_type' => Order::class,
+                    'subject_id' => $order->id,
+                    'metadata' => [
+                        'source' => 'table QR',
+                        'table_number' => $table->table_number,
+                        'reference_number' => $order->reference_number,
+                        'batch_number' => $batchNumber,
+                        'table_session_id' => $tableSession?->id,
+                    ],
+                ]);
+            }
+
+            if ($tableSession !== null) {
+                $this->tableSessionBills->refresh($tableSession);
+            }
 
             return $order;
         });
@@ -139,6 +310,9 @@ final class OrderService
     {
         return DB::transaction(function () use ($order, $to, $actor) {
             $locked = Order::lockForUpdate()->findOrFail($order->id);
+            if ($locked->held_at !== null) {
+                throw new \DomainException('Held orders cannot change kitchen status.');
+            }
 
             if (! $locked->canTransitionTo($to)) {
                 throw new \DomainException("Order {$locked->reference_number} cannot go from {$locked->status} to {$to}.");

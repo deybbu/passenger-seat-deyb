@@ -6,7 +6,14 @@
 @section('content')
     <div class="admin-card" style="margin-bottom:16px;">
         <div class="admin-card-header">
-            <span class="admin-card-title">Add recipe ingredient</span>
+            <span class="admin-card-title">Recipe &amp; food cost</span>
+            <form method="POST" action="{{ route('admin.recipes.target') }}" class="admin-inline-actions">
+                @csrf
+                <label class="admin-muted">Target %
+                    <input type="number" name="recipe_target_percent" value="{{ $targetPercent }}" min="1" max="100" step="0.1" style="width:78px;">
+                </label>
+                <button type="submit" class="btn-outline">Save target</button>
+            </form>
         </div>
         <form method="POST" action="{{ route('admin.recipes.store') }}" class="admin-form-grid admin-recipe-form">
             @csrf
@@ -34,7 +41,7 @@
     </div>
 
     <div class="admin-card">
-        <div class="admin-card-header"><span class="admin-card-title">Recipes & ingredient costs</span></div>
+        <div class="admin-card-header"><span class="admin-card-title">Menu item cost summary</span></div>
         @if($items->isEmpty())
             <div class="admin-empty-state">
                 <h3 class="admin-empty-title">No menu items yet</h3>
@@ -44,24 +51,52 @@
         @else
             <div class="admin-table-wrap">
                 <table class="admin-data-table">
-                    <thead><tr><th>Menu item</th><th>Category</th><th>Ingredient</th><th>Quantity per serving</th></tr></thead>
+                    <thead><tr><th>Dish</th><th>Price</th><th>Cost / portion</th><th>Cost %</th><th>Margin</th><th>Suggested price</th><th>Status</th></tr></thead>
                     <tbody>
-                        @php($hasLines = false)
                         @foreach($items as $item)
-                            @forelse($item->ingredients as $ingredient)
-                                @php($hasLines = true)
-                                <tr>
-                                    <td class="admin-strong">{{ $item->name }}</td>
-                                    <td>{{ $item->category->name ?? '—' }}</td>
-                                    <td>{{ $ingredient->name }}</td>
-                                    <td>{{ rtrim(rtrim(number_format((float) $ingredient->pivot->quantity, 3), '0'), '.') }} {{ $ingredient->unit }}</td>
-                                </tr>
-                            @empty
-                            @endforelse
+                            @php
+                                $complete = $item->ingredients->isNotEmpty() && $item->ingredients->every(fn ($ingredient) => $ingredient->unit_cost !== null);
+                                $cost = $complete ? $item->ingredients->sum(fn ($ingredient) => $ingredient->rawQuantityForPortion((float) $ingredient->pivot->quantity) * (float) $ingredient->unit_cost) : null;
+                                $percent = $cost !== null && (float) $item->price > 0 ? ($cost / (float) $item->price) * 100 : null;
+                            @endphp
+                            <tr>
+                                <td class="admin-strong">
+                                    {{ $item->name }}
+                                    <small class="admin-muted admin-block">{{ $item->category->name ?? '—' }}</small>
+                                    @if($item->ingredients->isNotEmpty())
+                                        <small class="admin-muted admin-block">
+                                            @foreach($item->ingredients as $ingredient)
+                                                <span>{{ $ingredient->name }} ({{ rtrim(rtrim(number_format((float) $ingredient->pivot->quantity, 3), '0'), '.') }} {{ $ingredient->unit }})</span>
+                                                <form method="POST" action="{{ route('admin.recipes.line.destroy', [$item, $ingredient]) }}" style="display:inline;" onsubmit="return confirm('Remove this ingredient from the recipe?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn-outline" style="padding:1px 5px;font-size:10px;">Remove</button>
+                                                </form>{{ $loop->last ? '' : ', ' }}
+                                            @endforeach
+                                        </small>
+                                    @endif
+                                </td>
+                                <td>₱{{ number_format((float) $item->price, 2) }}</td>
+                                <td>{{ $cost === null ? '—' : '₱'.number_format($cost, 2) }}</td>
+                                <td>{{ $percent === null ? '—' : number_format($percent, 1).'%' }}</td>
+                                <td>{{ $cost === null ? '—' : '₱'.number_format((float) $item->price - $cost, 2) }}</td>
+                                <td>{{ $cost === null ? '—' : '₱'.number_format($cost / max($targetPercent / 100, 0.001), 2) }}</td>
+                                <td>
+                                    @if($percent === null)
+                                        <span class="badge-status badge-out-of-stock">Incomplete</span>
+                                    @elseif($percent > 35)
+                                        <span class="badge-status badge-out-of-stock">Over ceiling</span>
+                                    @elseif($percent > $targetPercent)
+                                        <span class="badge-status badge-low-stock">Watch</span>
+                                    @else
+                                        <span class="badge-status badge-in-stock">On target</span>
+                                    @endif
+                                </td>
+                            </tr>
                         @endforeach
-                        @unless($hasLines)
-                            <tr><td colspan="4" class="admin-muted">No recipe lines have been added yet.</td></tr>
-                        @endunless
+                        @if($items->isEmpty())
+                            <tr><td colspan="7" class="admin-muted">No menu items are available yet.</td></tr>
+                        @endif
                     </tbody>
                 </table>
             </div>

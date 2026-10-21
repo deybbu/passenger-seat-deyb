@@ -9,11 +9,29 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderItem extends Model
 {
-    protected $fillable = ['order_id', 'menu_item_id', 'item_name', 'name', 'quantity', 'price', 'line_total'];
+    protected $fillable = [
+        'order_id',
+        'menu_item_id',
+        'menu_item_variant_id',
+        'item_name',
+        'name',
+        'variant_name_snapshot',
+        'category_name_snapshot',
+        'modifier_snapshot',
+        'quantity',
+        'price',
+        'line_total',
+        'cancelled_at',
+    ];
 
     protected function casts(): array
     {
-        return ['price' => 'decimal:2', 'quantity' => 'integer'];
+        return [
+            'price' => 'decimal:2',
+            'quantity' => 'integer',
+            'modifier_snapshot' => 'array',
+            'cancelled_at' => 'datetime',
+        ];
     }
 
     public function order(): BelongsTo
@@ -24,6 +42,11 @@ class OrderItem extends Model
     public function menuItem(): BelongsTo
     {
         return $this->belongsTo(MenuItem::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(MenuItemVariant::class, 'menu_item_variant_id');
     }
 
     public function getItemNameAttribute(): string

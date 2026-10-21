@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Ingredient;
 use App\Models\EventInquiry;
 use App\Models\Order;
+use App\Models\TableSession;
 use App\Support\AdminSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -21,6 +22,35 @@ class AdminAlertService
         $read = collect($request->session()->get(self::SESSION_KEY, []));
         $alerts = collect();
         $settings = AdminSettings::all();
+
+        if (Schema::hasTable('table_sessions') && Schema::hasColumn('table_sessions', 'status')) {
+            $billRequests = TableSession::query()
+                ->where('status', 'bill_requested')
+                ->whereNull('closed_at')
+                ->oldest('bill_requested_at')
+                ->limit(12)
+                ->get();
+
+            foreach ($billRequests as $session) {
+                $key = 'bill-request-'.$session->id.'-'.($session->bill_requested_at?->format('Uu') ?? 'pending');
+                $alerts->push([
+                    'key' => $key,
+                    'type' => 'bill',
+                    'title' => 'Ready for bill out',
+                    'body' => 'TABLE '.$session->table_number.' requested a bill by '
+                        .match ($session->requested_payment_method) {
+                            'cash' => 'Cash',
+                            'gcash' => 'GCash',
+                            'card' => 'Card',
+                            default => 'an unselected method',
+                        }
+                        .' for ₱'.number_format((float) $session->total, 2).'.',
+                    'href' => route('admin.billing'),
+                    'time' => optional($session->bill_requested_at)?->diffForHumans() ?? 'Just now',
+                    'unread' => ! $read->contains($key),
+                ]);
+            }
+        }
 
         if ($settings['low_stock_alerts'] && Schema::hasTable('ingredients')) {
             $lowStock = Ingredient::query()
@@ -46,6 +76,7 @@ class AdminAlertService
 
         if ($settings['order_alerts'] && Schema::hasTable('orders')) {
             $orders = Order::query()
+                ->notHeld()
                 ->whereIn('status', ['pending', 'preparing'])
                 ->latest()
                 ->limit(12)

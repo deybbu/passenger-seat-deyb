@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventInquiry extends Model
 {
@@ -47,6 +49,8 @@ class EventInquiry extends Model
         'dietary_restrictions',
         'special_requests',
         'status',
+        'budget',
+        'event_package_id',
     ];
 
     protected function casts(): array
@@ -54,6 +58,17 @@ class EventInquiry extends Model
         return [
             'event_date' => 'date',
             'guest_count' => 'integer',
+            'budget' => 'decimal:2',
         ];
+    }
+
+    public function package(): BelongsTo
+    {
+        return $this->belongsTo(EventPackage::class, 'event_package_id');
+    }
+
+    public function internalNotes(): HasMany
+    {
+        return $this->hasMany(EventInquiryNote::class);
     }
 }

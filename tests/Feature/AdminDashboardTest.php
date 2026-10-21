@@ -25,7 +25,7 @@ class AdminDashboardTest extends TestCase
             ->get(route('admin.dashboard'))
             ->assertOk()
             ->assertSee('Dashboard')
-            ->assertSee('Sales overview')
+            ->assertSee('Revenue trend')
             ->assertSee('Low-stock alerts')
             ->assertSee('Recent orders');
 
@@ -36,6 +36,13 @@ class AdminDashboardTest extends TestCase
             ->assertSee('30 days');
 
         $this->actingAs($admin)
+            ->get(route('admin.dashboard', ['range' => 'YEAR']))
+            ->assertOk()
+            ->assertViewHas('range', 'year')
+            ->assertViewHas('salesChart', fn ($chart) => count($chart) === 12)
+            ->assertSee('YEAR');
+
+        $this->actingAs($admin)
             ->get(route('admin.orders'))
             ->assertOk()
             ->assertSee('Order management')
@@ -44,13 +51,14 @@ class AdminDashboardTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.inventory'))
             ->assertOk()
-            ->assertSee('Inventory management')
+            ->assertSee('Inventory')
             ->assertSee('Ingredient inventory');
 
         $this->actingAs($admin)
             ->get(route('admin.pos'))
             ->assertOk()
-            ->assertSee('POS & transactions is empty', false);
+            ->assertSee('Current order')
+            ->assertSee('Search menu items');
 
         $this->actingAs($admin)
             ->get(route('admin.menu-management'))
@@ -61,9 +69,19 @@ class AdminDashboardTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.barcode'))
             ->assertOk()
-            ->assertSee('Barcode receiving')
-            ->assertSee('Receive stock by barcode')
-            ->assertSee('Available ingredient codes');
+            ->assertSee('Scan package')
+            ->assertSee('Type or scan a barcode')
+            ->assertSee('Manual lookup');
+
+        $this->actingAs($admin)
+            ->get(route('admin.purchase-orders'))
+            ->assertOk()
+            ->assertSee('Purchase orders');
+
+        $this->actingAs($admin)
+            ->get(route('admin.lots'))
+            ->assertOk()
+            ->assertSee('Lots &amp; traceability');
 
         foreach ([
             'admin.recipes',
@@ -87,7 +105,8 @@ class AdminDashboardTest extends TestCase
             ->assertSee('Pending')
             ->assertSee('Preparing')
             ->assertSee('Ready')
-            ->assertSee('Completed');
+            ->assertSee('Completed')
+            ->assertSee('Cancelled');
     }
 
     public function test_admin_can_mark_all_notifications_as_read(): void
@@ -165,6 +184,52 @@ class AdminDashboardTest extends TestCase
                 ->get(route('admin.dashboard', ['range' => 30]))
                 ->assertOk()
                 ->assertViewHas('salesChart', fn ($chart) => count($chart) === 30 && collect($chart)->sum('total') >= 120);
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    public function test_cancelled_orders_are_in_all_and_cancelled_tabs_and_customer_search(): void
+    {
+        $admin = new User(['id' => 1, 'name' => 'Administrator', 'email' => 'admin@example.com', 'role' => 'admin']);
+        $reference = 'PSR-CANCEL-'.Str::upper(Str::random(10));
+        $customer = 'Searchable Customer '.Str::upper(Str::random(6));
+        DB::beginTransaction();
+
+        try {
+            $orderAttributes = [
+                'reference_number' => $reference,
+                'type' => 'take_out',
+                'order_type' => 'take_out',
+                'subtotal' => 120,
+                'total' => 120,
+                'customer_name' => $customer,
+                'customer_phone' => null,
+                'special_instructions' => null,
+                'table_number' => null,
+                'total_amount' => 120,
+                'status' => 'cancelled',
+                'payment_status' => 'unpaid',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            DB::table('orders')->insert(array_intersect_key(
+                $orderAttributes,
+                array_flip(Schema::getColumnListing('orders')),
+            ));
+
+            $this->actingAs($admin)
+                ->get(route('admin.orders'))
+                ->assertOk()
+                ->assertSee($reference);
+            $this->actingAs($admin)
+                ->get(route('admin.orders', ['status' => 'cancelled']))
+                ->assertOk()
+                ->assertSee($reference);
+            $this->actingAs($admin)
+                ->get(route('admin.orders', ['q' => $customer]))
+                ->assertOk()
+                ->assertSee($reference);
         } finally {
             DB::rollBack();
         }
