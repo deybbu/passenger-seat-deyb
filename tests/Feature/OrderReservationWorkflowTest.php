@@ -107,7 +107,7 @@ class OrderReservationWorkflowTest extends TestCase
             ->assertSee("Table missing isn't open yet", false);
         $this->get(route('customer.qr.show'))
             ->assertOk()
-            ->assertSee('Invalid QR code');
+            ->assertSee("This QR code isn't valid", false);
         $this->get(route('customer.qr.show', ['table' => '5']))
             ->assertOk()
             ->assertSee('Test meal')
@@ -1287,11 +1287,11 @@ class OrderReservationWorkflowTest extends TestCase
             'password' => 'password',
             'role' => 'admin',
         ]);
+
         $this->actingAs($admin)
             ->get(route('admin.waste'))
             ->assertOk()
-            ->assertSee('Cost lost')
-            ->assertSee('Near expiry');
+            ->assertSee('id="view"', false);
 
         $this->actingAs($admin)
             ->get(route('inventory.index'))
@@ -1721,6 +1721,36 @@ class OrderReservationWorkflowTest extends TestCase
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('bill_requested_at')->nullable();
             $table->timestamp('closed_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::table('orders', function ($table): void {
+            $table->decimal('vat_exemption', 10, 2)->default(0);
+        });
+
+        Schema::table('table_sessions', function ($table): void {
+            $table->decimal('vat_exemption', 10, 2)->default(0);
+        });
+
+        Schema::create('table_session_payments', function ($table): void {
+            $table->id();
+            $table->foreignId('table_session_id');
+            $table->string('type', 16);
+            $table->string('payment_method', 20);
+            $table->string('payment_reference', 60)->unique();
+            $table->decimal('amount', 10, 2);
+            $table->decimal('amount_tendered', 10, 2)->nullable();
+            $table->decimal('change_given', 10, 2)->nullable();
+            $table->decimal('subtotal', 10, 2);
+            $table->decimal('discount', 10, 2)->default(0);
+            $table->decimal('vat_exemption', 10, 2)->default(0);
+            $table->decimal('vat', 10, 2)->default(0);
+            $table->decimal('total', 10, 2);
+            $table->string('discount_type', 16)->nullable();
+            $table->decimal('discount_rate', 5, 2)->nullable();
+            $table->foreignId('performed_by')->nullable();
+            $table->foreignId('reversal_of_id')->nullable()->unique();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }

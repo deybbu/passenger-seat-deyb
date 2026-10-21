@@ -4,10 +4,34 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\MenuCategory;
+use App\Models\MenuItem;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PublicLandingPageTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $category = MenuCategory::query()->create([
+            'name' => 'Test favorites',
+            'slug' => 'test-favorites',
+            'is_active' => true,
+        ]);
+        MenuItem::query()->create([
+            'menu_category_id' => $category->id,
+            'name' => 'Test featured dish',
+            'slug' => 'test-featured-dish',
+            'price' => 100,
+            'is_active' => true,
+            'is_available' => true,
+        ]);
+    }
+
     public function test_homepage_uses_reference_layout_and_static_sections(): void
     {
         $this->get(route('home'))

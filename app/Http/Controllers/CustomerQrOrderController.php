@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -29,6 +30,53 @@ class CustomerQrOrderController extends Controller
 {
     public function show(Request $request): View|RedirectResponse
     {
+        $tableNumber = trim((string) $request->query('table', ''));
+        if ($tableNumber !== '') {
+            $tableSession = TableSession::query()
+                ->where('table_number', $tableNumber)
+                ->whereNull('closed_at')
+                ->latest('opened_at')
+                ->first();
+            $tableOpen = $tableSession !== null
+                && ($tableSession->expires_at === null || $tableSession->expires_at->isFuture());
+            $menuItems = collect();
+            if ($tableOpen && $this->qrEnabled() && $this->tableQrEnabled($tableNumber)) {
+                $menuQuery = MenuItem::query()
+                    ->with(['category:id,name', 'ingredients:id,name'])
+                    ->withStockAvailability()
+                    ->where('is_active', true)
+                    ->where('is_available', true);
+                if (Schema::hasColumn('menu_items', 'archived_at')) {
+                    $menuQuery->whereNull('archived_at');
+                }
+
+                $menuItems = $menuQuery->orderBy('name')->get()
+                    ->filter(fn (MenuItem $item): bool => $item->isOrderable())
+                    ->values();
+            }
+            $items = $menuItems->map(fn (MenuItem $item): array => [
+                'id' => (int) $item->id,
+                'name' => $item->name,
+                'description' => $item->description,
+                'price' => (float) $item->price,
+                'category' => $item->category?->name ?? 'Uncategorized',
+                'photo' => $item->image_path ? Storage::disk('public')->url($item->image_path) : null,
+                'ingredients' => $item->ingredients->pluck('name')->values()->all(),
+            ])->values()->all();
+
+            return view('customer.qr-order', [
+                'invalidTable' => false,
+                'qrEnabled' => $this->qrEnabled(),
+                'tableEnabled' => $this->tableQrEnabled($tableNumber),
+                'tableOpen' => $tableOpen,
+                'tableNumber' => $tableNumber,
+                'tableToken' => $tableSession?->public_token,
+                'submissionToken' => (string) Str::uuid(),
+                'items' => $items,
+                'categories' => collect($items)->pluck('category')->unique()->values()->all(),
+            ]);
+        }
+
         $qrToken = trim((string) $request->query('qr', ''));
         $restaurantTable = $qrToken !== '' && Schema::hasTable('restaurant_tables')
             ? RestaurantTable::query()->where('qr_token', $qrToken)->first()
@@ -492,6 +540,7 @@ class CustomerQrOrderController extends Controller
         return MenuItem::query()
             ->with([
                 'category:id,name',
+                'ingredients:id,name',
                 'variants',
                 'modifierGroups.options',
             ])

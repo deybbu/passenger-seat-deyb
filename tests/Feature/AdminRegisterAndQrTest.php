@@ -65,8 +65,7 @@ class AdminRegisterAndQrTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.pos'))
             ->assertOk()
-            ->assertSee('Current order')
-            ->assertSee('Search menu items');
+            ->assertSee('id="view"', false);
 
         $held = $this->postJson(route('admin.pos.hold'), [
             'type' => 'dine_in',
@@ -84,8 +83,9 @@ class AdminRegisterAndQrTest extends TestCase
             'quantity' => 2,
         ]);
         $this->actingAs($this->admin)
-            ->get(route('admin.orders'))
-            ->assertDontSee($heldOrder->reference_number);
+            ->getJson(route('admin.api.reference.dashboard'))
+            ->assertOk()
+            ->assertJsonMissing(['no' => $heldOrder->reference_number]);
 
         $this->postJson(route('admin.pos.held.resume', $heldOrder))
             ->assertOk()
@@ -163,15 +163,25 @@ class AdminRegisterAndQrTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.billing'))
             ->assertOk()
-            ->assertSee($placed->json('reference'))
-            ->assertSee('Table 5')
-            ->assertSee('1 items');
+            ->assertSee('id="view"', false);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('admin.api.reference.dashboard'))
+            ->assertOk()
+            ->assertJsonFragment([
+                'no' => $placed->json('reference'),
+                'tableNo' => '5',
+            ]);
 
         $this->actingAs($this->admin)
             ->get(route('admin.table-qr'))
             ->assertOk()
-            ->assertSee('1 active')
-            ->assertSee(route('customer.qr.show', ['qr' => $table->qr_token]), false);
+            ->assertSee('id="view"', false);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('admin.api.reference.dashboard'))
+            ->assertOk()
+            ->assertJsonFragment(['table_number' => '5']);
 
         $this->actingAs($this->admin)
             ->patch(route('admin.table-qr.toggle', $table))

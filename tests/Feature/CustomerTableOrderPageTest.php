@@ -224,7 +224,7 @@ class CustomerTableOrderPageTest extends TestCase
     {
         $this->get(route('customer.qr.show', ['table' => '12']))
             ->assertOk()
-            ->assertSee("This QR code isn't valid", false)
+            ->assertSee("Table 12 isn't open yet", false)
             ->assertDontSee('Database meal');
     }
 

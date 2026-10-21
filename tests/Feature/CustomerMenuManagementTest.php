@@ -27,17 +27,10 @@ class CustomerMenuManagementTest extends TestCase
         ]);
         DB::purge('customer_menu_test');
 
-        foreach ([
-            '2026_10_10_000001_create_menu_categories_table.php',
-            '2026_10_10_000002_create_menu_items_table.php',
-        ] as $migration) {
-            Artisan::call('migrate', [
-                '--database' => 'customer_menu_test',
-                '--path' => database_path('migrations/'.$migration),
-                '--realpath' => true,
-                '--force' => true,
-            ]);
-        }
+        Artisan::call('migrate:fresh', [
+            '--database' => 'customer_menu_test',
+            '--force' => true,
+        ]);
     }
 
     public function test_public_menu_only_shows_active_available_items(): void

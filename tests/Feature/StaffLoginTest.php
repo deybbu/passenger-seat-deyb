@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class StaffLoginTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_staff_login_is_available_at_its_separate_route(): void
     {
         $this->get('/staff/login')->assertOk();
