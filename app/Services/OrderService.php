@@ -43,6 +43,7 @@ final class OrderService
 
         return DB::transaction(function () use ($data, $lines, $staff) {
             $isTableQr = ($data['source'] ?? null) === 'table_qr';
+            $isCustomerOrder = $isTableQr || ($data['source'] ?? null) === 'cashier';
             $table = null;
             $tableSession = null;
             $batchNumber = null;
@@ -76,7 +77,7 @@ final class OrderService
 
             $lockedLines = $lines->sortBy(
                 fn ($line) => $line->item_id ?? $line->item->id,
-            )->map(function ($line) use ($isTableQr) {
+            )->map(function ($line) use ($isTableQr, $isCustomerOrder) {
                 $sourceItem = $line->item ?? null;
                 $itemId = (int) ($line->item_id ?? $sourceItem?->id ?? 0);
                 $item = MenuItem::query()
@@ -86,7 +87,7 @@ final class OrderService
                     ->first();
 
                 if ($item === null || ! $item->isOrderable()
-                    || ($isTableQr && ($item->archived_at !== null
+                    || ($isCustomerOrder && ($item->archived_at !== null
                         || ($item->category !== null && ! $item->category->is_active)))) {
                     throw new \DomainException('One or more selected dishes are no longer available.');
                 }
@@ -212,11 +213,11 @@ final class OrderService
                 'payment_status' => 'unpaid',
             ];
 
-            if ($isTableQr && Schema::hasColumn('orders', 'table_id')) {
-                $orderAttributes['table_id'] = $table->id;
+            if (($isTableQr || isset($data['table_id'])) && Schema::hasColumn('orders', 'table_id')) {
+                $orderAttributes['table_id'] = $isTableQr ? $table->id : $data['table_id'];
             }
-            if ($isTableQr && Schema::hasColumn('orders', 'source')) {
-                $orderAttributes['source'] = 'table_qr';
+            if (Schema::hasColumn('orders', 'source')) {
+                $orderAttributes['source'] = $data['source'] ?? ($isTableQr ? 'table_qr' : 'staff');
             }
             if ($tableSession !== null && Schema::hasColumn('orders', 'table_session_id')) {
                 $orderAttributes['table_session_id'] = $tableSession->id;
@@ -249,7 +250,9 @@ final class OrderService
                 'from_status' => null,
                 'to_status' => 'pending',
                 'changed_by' => $staff?->id,
-                'note' => 'Order placed',
+                'note' => ($data['source'] ?? null) === 'cashier' && $batchNumber !== null
+                    ? "Cashier order placed as batch {$batchNumber}"
+                    : 'Order placed',
             ]);
 
             foreach ($lockedLines as $line) {
@@ -283,6 +286,7 @@ final class OrderService
 
             if ($isTableQr) {
                 ActivityLog::query()->create([
+                    'user_id' => $staff?->id,
                     'action' => 'Customer table QR order placed',
                     'module' => 'orders',
                     'subject_type' => Order::class,
@@ -293,6 +297,24 @@ final class OrderService
                         'reference_number' => $order->reference_number,
                         'batch_number' => $batchNumber,
                         'table_session_id' => $tableSession?->id,
+                    ],
+                ]);
+            }
+
+            if (($data['source'] ?? null) === 'cashier') {
+                ActivityLog::query()->create([
+                    'user_id' => $staff?->id,
+                    'action' => 'Cashier pay-later order placed',
+                    'module' => 'orders',
+                    'subject_type' => Order::class,
+                    'subject_id' => $order->id,
+                    'metadata' => [
+                        'source' => 'cashier',
+                        'table_number' => $order->table_number,
+                        'reference_number' => $order->reference_number,
+                        'batch_number' => $batchNumber,
+                        'table_session_id' => $tableSession?->id,
+                        'customer_name' => $order->customer_name,
                     ],
                 ]);
             }

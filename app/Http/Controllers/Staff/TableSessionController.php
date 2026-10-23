@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PosRestaurantTableResource;
+use App\Models\ActivityLog;
 use App\Models\Ingredient;
 use App\Models\MenuItem;
 use App\Models\Order;
@@ -14,6 +16,7 @@ use App\Services\RestaurantTableQrService;
 use App\Services\TableSessionStatusService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -95,18 +98,61 @@ class TableSessionController extends Controller
         Request $request,
         RestaurantTable $restaurantTable,
         RestaurantTableQrService $qr,
-    ): RedirectResponse {
-        abort_unless($request->user()->hasRole('cashier') || $request->user()->hasRole('admin'), 403);
+    ): RedirectResponse|JsonResponse {
+        abort_unless($request->user()->hasRole('cashier', 'manager', 'admin'), 403);
         if (! $qr->isGloballyEnabled()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Customer QR menus are globally disabled in System Settings.',
+                ], 409);
+            }
+
             return redirect()->route('staff.pos.table-qr')
                 ->with('error', 'Customer QR menus are globally disabled in System Settings.');
         }
 
         $table = $qr->toggle($restaurantTable, $request->user());
 
+        if ($request->expectsJson()) {
+            return response()->json((new PosRestaurantTableResource($table))->resolve($request));
+        }
+
         return redirect()->route('staff.pos.table-qr')->with('status', $table->is_enabled
             ? "{$table->name} QR ordering enabled."
             : "{$table->name} QR ordering disabled.");
+    }
+
+    public function storePosTable(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->hasRole('cashier', 'manager', 'admin'), 403);
+
+        $data = $request->validate([
+            'table_number' => ['required', 'string', 'max:3', 'regex:/^[0-9]{1,3}$/', 'unique:restaurant_tables,table_number'],
+        ]);
+        $number = (string) (int) $data['table_number'];
+        $table = DB::transaction(function () use ($request, $number): RestaurantTable {
+            $table = RestaurantTable::query()->create([
+                'table_number' => $number,
+                'name' => 'Table '.$number,
+                'is_enabled' => false,
+            ]);
+
+            ActivityLog::query()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'Created '.$table->name,
+                'module' => 'Table QR',
+                'subject_type' => RestaurantTable::class,
+                'subject_id' => $table->id,
+                'metadata' => [
+                    'table_number' => $table->table_number,
+                    'qr_enabled' => $table->is_enabled,
+                ],
+            ]);
+
+            return $table;
+        });
+
+        return response()->json((new PosRestaurantTableResource($table))->resolve($request), 201);
     }
 
     public function open(Request $request): RedirectResponse

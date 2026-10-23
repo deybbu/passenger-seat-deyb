@@ -6,7 +6,9 @@ namespace Tests\Feature;
 
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
+use App\Models\Bill;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\RestaurantTable;
 use App\Models\Role;
 use App\Models\TableSession;
@@ -117,7 +119,7 @@ class TableSessionPaymentTest extends TestCase
             'amount_tendered' => 200,
         ])->assertRedirect(route('staff.pos.index'));
 
-        $payment = TableSessionPayment::query()->where('type', 'payment')->firstOrFail();
+        $payment = Payment::query()->where('table_session_id', $session->id)->firstOrFail();
         $this->assertSame(200.0, (float) $payment->subtotal);
         $this->assertSame(21.43, (float) $payment->vat_exemption);
         $this->assertSame(35.71, (float) $payment->discount);
@@ -127,11 +129,11 @@ class TableSessionPaymentTest extends TestCase
         $this->assertSame('closed', $session->fresh()->status);
         $this->assertNull($session->fresh()->active_table_number);
         $this->assertSame('cash', $session->fresh()->paid_payment_method);
-        $this->assertSame($payment->payment_reference, TableSessionPayment::query()->firstOrFail()->payment_reference);
+        $this->assertSame('cash', $payment->payment_method);
         $this->assertDatabaseHas('activity_logs', [
-            'subject_type' => TableSession::class,
-            'subject_id' => $session->id,
-            'action' => 'Table session payment recorded',
+            'subject_type' => Bill::class,
+            'subject_id' => $payment->bill_id,
+            'action' => 'Bill payment recorded',
         ]);
         $this->assertTrue(Order::query()->whereIn('reference_number', $references)
             ->get()->every(fn (Order $order): bool => $order->payment_status === 'paid'));
@@ -139,7 +141,7 @@ class TableSessionPaymentTest extends TestCase
         $this->post(route('staff.pos.table-session-reopen', $session), [
             'reason' => 'Payment method was recorded incorrectly.',
         ])->assertForbidden();
-        $this->assertDatabaseCount('table_session_payments', 1);
+        $this->assertNull($payment->fresh()->reversed_at);
 
         $managerRole = Role::query()->where('key', 'restaurant_manager')->firstOrFail();
         $manager = User::query()->create([
@@ -155,10 +157,11 @@ class TableSessionPaymentTest extends TestCase
             ])
             ->assertRedirect(route('staff.pos.ledger'));
 
-        $reversal = TableSessionPayment::query()->where('type', 'reversal')->firstOrFail();
-        $this->assertSame($payment->id, $reversal->reversal_of_id);
-        $this->assertSame($payment->payment_reference, $reversal->reversalOf->payment_reference);
-        $this->assertSame('Payment method was recorded incorrectly.', $reversal->notes);
+        $reversedPayment = $payment->fresh();
+        $this->assertSame($manager->id, $reversedPayment->reversed_by);
+        $this->assertSame('Payment method was recorded incorrectly.', $reversedPayment->reversal_reason);
+        $this->assertNotNull($reversedPayment->reversed_at);
+        $this->assertDatabaseHas('bills', ['table_session_id' => $session->id, 'status' => 'open']);
         $this->assertSame('bill_requested', $session->fresh()->status);
         $this->assertSame('12', $session->fresh()->active_table_number);
         $this->assertTrue(Order::query()->whereIn('reference_number', $references)

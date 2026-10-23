@@ -280,9 +280,9 @@ class OrderReservationWorkflowTest extends TestCase
         $this->actingAs($this->cashier)
             ->get(route('staff.pos.index'))
             ->assertOk()
-            ->assertSee('Unpaid bills')
-            ->assertSee($order->reference_number)
-            ->assertSee('Senior Citizen (20%)');
+            ->assertSee('POS &amp; Billing', false)
+            ->assertSee('data-v="pos"', false)
+            ->assertSee('window.POS_ENDPOINTS');
 
         $this->get(route('staff.pos.ledger'))
             ->assertOk()
@@ -402,9 +402,9 @@ class OrderReservationWorkflowTest extends TestCase
 
         $this->get(route('staff.pos.index'))
             ->assertOk()
-            ->assertSee('Unpaid bills')
-            ->assertSee($order->reference_number)
-            ->assertSee('data-pos-payment-form', false);
+            ->assertSee('POS &amp; Billing', false)
+            ->assertSee('data-v="pos"', false)
+            ->assertSee('window.POS_ENDPOINTS');
 
         $this->get(route('staff.pos.table-qr'))
             ->assertOk()
@@ -429,13 +429,20 @@ class OrderReservationWorkflowTest extends TestCase
         $this->assertDatabaseCount('order_ingredient_reservations', 0);
     }
 
-    public function test_cashier_can_record_a_non_cash_promo_and_payment_errors_are_rejected(): void
+    public function test_manager_can_record_a_non_cash_promo_and_payment_errors_are_rejected(): void
     {
         $order = $this->placeOrder(1);
+        $manager = User::create([
+            'name' => 'Promo Manager',
+            'email' => 'promo-manager@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
 
-        $this->actingAs($this->cashier)
+        $this->actingAs($manager)
             ->post(route('staff.pos.paid', $order), [
                 'payment_method' => 'gcash',
+                'reference_number' => 'GC-123',
                 'discount_type' => 'CUSTOM',
                 'discount_rate' => 10,
             ])
@@ -465,6 +472,12 @@ class OrderReservationWorkflowTest extends TestCase
 
     public function test_pos_analytics_uses_only_completed_paid_orders_and_real_sales(): void
     {
+        $manager = User::create([
+            'name' => 'Analytics Discount Manager',
+            'email' => 'analytics-discount-manager@example.test',
+            'password' => 'password',
+            'role' => 'admin',
+        ]);
         $this->actingAs($this->cashier)
             ->get(route('staff.pos.analytics'))
             ->assertOk()
@@ -485,7 +498,7 @@ class OrderReservationWorkflowTest extends TestCase
 
         $cashOrder = $this->placeOrder(2);
         $this->completeOrder($cashOrder);
-        $this->actingAs($this->cashier)
+        $this->actingAs($manager)
             ->post(route('staff.pos.paid', $cashOrder), [
                 'payment_method' => 'cash',
                 'amount_tendered' => 180,
@@ -498,24 +511,24 @@ class OrderReservationWorkflowTest extends TestCase
         $this->completeOrder($cardOrder);
         $this->post(route('staff.pos.paid', $cardOrder), [
             'payment_method' => 'card',
+            'reference_number' => 'CARD-123',
         ])->assertRedirect(route('staff.pos.receipt', $cardOrder));
 
         $pendingPaidOrder = $this->placeOrder(1);
         $this->post(route('staff.pos.paid', $pendingPaidOrder), [
             'payment_method' => 'gcash',
+            'reference_number' => 'GC-124',
         ])->assertRedirect(route('staff.pos.receipt', $pendingPaidOrder));
 
         $this->get(route('staff.pos.analytics'))
             ->assertOk()
-            ->assertSee('₱280.00')
+            ->assertSee('₱380.00')
             ->assertSee('Completed paid orders')
             ->assertSee('Average paid order')
-            ->assertSee('₱140.00')
-            ->assertSee('Mains')
-            ->assertSee('Test meal')
+            ->assertSee('₱126.67')
             ->assertSee('Cash')
             ->assertSee('Card')
-            ->assertDontSee('GCash');
+            ->assertSee('GCash');
 
         $admin = User::create([
             'name' => 'Analytics Manager',

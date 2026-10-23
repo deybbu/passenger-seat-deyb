@@ -10,6 +10,7 @@ use App\Models\InventoryLog;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\PurchaseOrder;
 use App\Models\InventoryStockLot;
 use App\Models\RestaurantTable;
@@ -197,13 +198,26 @@ class DashboardController extends Controller
 
     private function referenceOrders()
     {
+        $hasPaymentLedger = Schema::hasTable('payments');
+        $orderLoads = ['items.menuItem', 'items.variant'];
+        if ($hasPaymentLedger) {
+            $orderLoads[] = 'payments';
+        }
+
         return Order::query()
             ->notHeld()
-            ->with(['items.menuItem', 'items.variant'])
+            ->with($orderLoads)
             ->latest()
             ->limit(200)
             ->get()
-            ->map(fn (Order $order): array => [
+            ->map(function (Order $order) use ($hasPaymentLedger): array {
+                $recordedMethods = $hasPaymentLedger
+                    ? $order->payments->pluck('payment_method')->unique()->map(fn (string $method): string => match ($method) {
+                        'gcash' => 'GCash', 'card' => 'Card', 'cash' => 'Cash', default => ucfirst($method),
+                    })->implode(', ')
+                    : '';
+
+                return [
                 'id' => $order->id,
                 'no' => $order->reference_number ?: $order->id,
                 'items' => $order->items->map(fn (OrderItem $item): array => [
@@ -218,14 +232,15 @@ class DashboardController extends Controller
                 'source' => $order->source === 'table_qr'
                     ? 'Table QR'
                     : ($order->table_session_id ? 'QR' : 'POS'),
-                'paym' => $order->payment_method,
+                'paym' => $recordedMethods !== '' ? $recordedMethods : $order->payment_method,
                 'paymentStatus' => $order->payment_status,
                 'revenue' => $order->isPaid() || $order->status === 'completed',
                 'revenueToday' => ($order->isPaid() || $order->status === 'completed')
                     && ($order->created_at?->isToday() ?? false),
                 'customer' => $order->customer_name,
                 'tableNo' => $order->table_number,
-            ])
+                ];
+            })
             ->values();
     }
 
@@ -340,16 +355,35 @@ class DashboardController extends Controller
             $periodEnd = $now->copy()->endOfDay();
         }
 
+        $orderLoads = ['items' => fn ($query) => $query->whereNull('cancelled_at')->with('menuItem.category')];
+        if (Schema::hasTable('payments')) {
+            $orderLoads[] = 'payments';
+        }
         $orders = Order::query()
             ->notHeld()
             ->where('payment_status', 'paid')
             ->where('status', '!=', 'cancelled')
             ->whereNotNull('paid_at')
             ->whereBetween('paid_at', [$periodStart, $periodEnd])
-            ->with(['items' => fn ($query) => $query->whereNull('cancelled_at')->with('menuItem.category')])
+            ->with($orderLoads)
             ->orderBy('paid_at')
             ->orderBy('id')
             ->get();
+        $payments = Schema::hasTable('payments')
+            ? Payment::query()
+                ->whereNull('reversed_at')
+                ->whereBetween('paid_at', [$periodStart, $periodEnd])
+                ->with('orders')
+                ->orderBy('paid_at')
+                ->get()
+            : collect();
+        $paymentAmountsByOrder = [];
+        foreach ($payments as $payment) {
+            foreach ($payment->orders as $paidOrder) {
+                $paymentAmountsByOrder[$paidOrder->id] = ($paymentAmountsByOrder[$paidOrder->id] ?? 0.0)
+                    + (float) $paidOrder->pivot->allocated_amount;
+            }
+        }
 
         $methodTotals = [
             'cash' => ['method' => 'Cash', 'orders' => 0, 'cents' => 0],
@@ -361,6 +395,7 @@ class DashboardController extends Controller
         $dailyCents = [];
         $totalCents = 0;
         $totalUnits = 0;
+        $paymentOrderIds = [];
 
         if ($yearly) {
             for ($month = 0; $month < 12; $month++) {
@@ -374,28 +409,75 @@ class DashboardController extends Controller
             }
         }
 
-        foreach ($orders as $order) {
-            $cents = (int) round((float) $order->total_amount * 100);
-            $totalCents += $cents;
-            $paidAt = $order->paid_at->copy()->timezone($timezone);
-            $dateKey = $yearly ? $paidAt->format('Y-m') : $paidAt->toDateString();
-            if (array_key_exists($dateKey, $dailyCents)) {
-                $dailyCents[$dateKey] += $cents;
-            }
+        if ($payments->isNotEmpty()) {
+            foreach ($payments as $payment) {
+                $cents = (int) round((float) $payment->total * 100);
+                $totalCents += $cents;
+                $paidAt = $payment->paid_at->copy()->timezone($timezone);
+                $dateKey = $yearly ? $paidAt->format('Y-m') : $paidAt->toDateString();
+                if (array_key_exists($dateKey, $dailyCents)) {
+                    $dailyCents[$dateKey] += $cents;
+                }
 
-            $methodKey = strtolower(trim((string) $order->payment_method));
-            if ($methodKey === '') {
-                $methodKey = 'not_recorded';
+                $methodKey = strtolower(trim((string) $payment->payment_method)) ?: 'not_recorded';
+                if (! isset($methodTotals[$methodKey])) {
+                    $methodTotals[$methodKey] = [
+                        'method' => $methodKey === 'not_recorded' ? 'Not recorded' : ucfirst($methodKey),
+                        'orders' => 0,
+                        'cents' => 0,
+                    ];
+                }
+                $methodTotals[$methodKey]['orders']++;
+                $methodTotals[$methodKey]['cents'] += $cents;
+                foreach ($payment->orders as $paidOrder) {
+                    $paymentOrderIds[$methodKey][$paidOrder->id] = true;
+                }
             }
-            if (! isset($methodTotals[$methodKey])) {
-                $methodTotals[$methodKey] = [
-                    'method' => $methodKey === 'not_recorded' ? 'Not recorded' : ucfirst($methodKey),
-                    'orders' => 0,
-                    'cents' => 0,
-                ];
+            foreach ($paymentOrderIds as $methodKey => $orderIds) {
+                $methodTotals[$methodKey]['orders'] = count($orderIds);
             }
-            $methodTotals[$methodKey]['orders']++;
-            $methodTotals[$methodKey]['cents'] += $cents;
+            foreach ($orders->filter(fn (Order $order): bool => $order->payments->isEmpty()) as $order) {
+                $cents = (int) round((float) $order->total_amount * 100);
+                $totalCents += $cents;
+                $paidAt = $order->paid_at->copy()->timezone($timezone);
+                $dateKey = $yearly ? $paidAt->format('Y-m') : $paidAt->toDateString();
+                if (array_key_exists($dateKey, $dailyCents)) {
+                    $dailyCents[$dateKey] += $cents;
+                }
+                $methodKey = strtolower(trim((string) $order->payment_method)) ?: 'not_recorded';
+                if (! isset($methodTotals[$methodKey])) {
+                    $methodTotals[$methodKey] = [
+                        'method' => $methodKey === 'not_recorded' ? 'Not recorded' : ucfirst($methodKey),
+                        'orders' => 0,
+                        'cents' => 0,
+                    ];
+                }
+                $methodTotals[$methodKey]['orders']++;
+                $methodTotals[$methodKey]['cents'] += $cents;
+            }
+        }
+
+        foreach ($orders as $order) {
+            $cents = (int) round((float) ($paymentAmountsByOrder[$order->id] ?? $order->total_amount) * 100);
+            if ($payments->isEmpty()) {
+                $totalCents += $cents;
+                $paidAt = $order->paid_at->copy()->timezone($timezone);
+                $dateKey = $yearly ? $paidAt->format('Y-m') : $paidAt->toDateString();
+                if (array_key_exists($dateKey, $dailyCents)) {
+                    $dailyCents[$dateKey] += $cents;
+                }
+
+                $methodKey = strtolower(trim((string) $order->payment_method)) ?: 'not_recorded';
+                if (! isset($methodTotals[$methodKey])) {
+                    $methodTotals[$methodKey] = [
+                        'method' => $methodKey === 'not_recorded' ? 'Not recorded' : ucfirst($methodKey),
+                        'orders' => 0,
+                        'cents' => 0,
+                    ];
+                }
+                $methodTotals[$methodKey]['orders']++;
+                $methodTotals[$methodKey]['cents'] += $cents;
+            }
 
             $items = $order->items;
             $weights = $items->map(fn (OrderItem $item): int => max(

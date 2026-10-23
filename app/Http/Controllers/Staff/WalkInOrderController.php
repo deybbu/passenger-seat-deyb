@@ -111,6 +111,7 @@ class WalkInOrderController extends Controller
         if ($request->user()->hasRole('cashier')) {
             $rules += [
                 'payment_method' => ['required', Rule::in(['cash', 'card', 'gcash'])],
+                'reference_number' => ['nullable', 'string', 'max:100', 'required_if:payment_method,card', 'required_if:payment_method,gcash'],
                 'discount_type' => ['nullable', Rule::in(['SC', 'PWD', 'CUSTOM'])],
                 'discount_rate' => ['nullable', 'numeric', 'min:0', 'max:100', 'required_if:discount_type,CUSTOM'],
                 'discount_cardholder_name' => [

@@ -58,6 +58,16 @@ class TableSession extends Model
         return $this->hasMany(TableSessionPayment::class);
     }
 
+    public function recordedPayments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function bills(): HasMany
+    {
+        return $this->hasMany(Bill::class);
+    }
+
     public function restaurantTable(): BelongsTo
     {
         return $this->belongsTo(RestaurantTable::class);

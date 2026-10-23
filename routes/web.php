@@ -63,7 +63,7 @@ Route::post('/staff/logout', [LoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('staff.logout');
 
-Route::middleware(['auth', 'role:kitchen,cashier'])
+Route::middleware(['auth', 'role:kitchen,cashier,manager'])
     ->prefix('staff')
     ->name('staff.')
     ->group(function (): void {
@@ -91,11 +91,16 @@ Route::middleware(['auth', 'role:kitchen'])
         Route::get('/inventory', 'inventory')->name('inventory');
     });
 
-Route::middleware(['auth', 'role:cashier'])
+Route::middleware(['auth', 'role:cashier,manager,admin'])
     ->prefix('staff/pos')
     ->name('staff.pos.')
     ->group(function (): void {
         Route::get('/', [POSController::class, 'index'])->name('index');
+        Route::get('/data', [POSController::class, 'data'])->name('data');
+        Route::post('/orders', [POSController::class, 'placeRegisterOrder'])->name('orders.store');
+        Route::post('/tables', [TableSessionController::class, 'storePosTable'])->name('tables.store');
+        Route::get('/tables/{restaurantTable}/qr-image', [TableQrController::class, 'image'])
+            ->name('table-qr.image');
         Route::get('/bill-requests', [POSController::class, 'billRequests'])->name('bill-requests');
         Route::get('/orders', [POSController::class, 'orders'])->name('orders');
         Route::get('/analytics', [POSController::class, 'analytics'])->name('analytics');
@@ -106,6 +111,9 @@ Route::middleware(['auth', 'role:cashier'])
             ->name('table-session-bill');
         Route::post('/table-sessions/{tableSession}/paid', [POSController::class, 'markTableSessionPaid'])
             ->name('table-session-paid');
+        Route::post('/table-sessions/{tableSession}/bills', [POSController::class, 'splitTableSessionBills'])
+            ->name('table-session-bills.store');
+        Route::post('/bills/{bill}/pay', [POSController::class, 'payBill'])->name('bills.pay');
         Route::post('/table-sessions/{tableSession}/reopen', [POSController::class, 'reopenTableSession'])
             ->name('table-session-reopen');
         Route::post('/tables/{restaurantTable}/paid', [POSController::class, 'markTablePaid'])

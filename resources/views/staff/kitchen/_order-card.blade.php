@@ -10,10 +10,12 @@
     <div class="oh">
         <div>
             <b class="tb">
-                @if ($order->source === 'table_qr' && $order->table_session_id && $order->batch_number)
+                @if ($order->table_session_id && $order->batch_number)
                     Table {{ $order->table_number }} - Order {{ $order->batch_number }}
                 @else
-                    {{ $order->table_number ? 'Table '.$order->table_number : $orderTypeLabel }}
+                    {{ $order->table_number
+                        ? 'Table '.$order->table_number
+                        : ($order->source === 'cashier' ? 'Take-out - '.$order->customer_name : $orderTypeLabel) }}
                 @endif
             </b>
             <small>{{ $order->reference_number }}</small>

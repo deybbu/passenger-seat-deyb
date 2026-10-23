@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\Bill;
+use App\Models\BillItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\RestaurantTable;
 use App\Models\TableSession;
 use App\Models\TableSessionPayment;
@@ -177,7 +180,7 @@ final class TableSessionPaymentService
         }, 3);
     }
 
-    public function reopen(TableSession $tableSession, string $reason, User $manager): TableSessionPayment
+    public function reopen(TableSession $tableSession, string $reason, User $manager): TableSessionPayment|Payment
     {
         abort_unless(
             in_array($manager->assignedRole?->key, ['restaurant_manager', 'super_admin'], true),
@@ -185,7 +188,7 @@ final class TableSessionPaymentService
             'Only a Restaurant Manager or Super Admin can reopen a paid table bill.',
         );
 
-        return DB::transaction(function () use ($tableSession, $reason, $manager): TableSessionPayment {
+        return DB::transaction(function () use ($tableSession, $reason, $manager): TableSessionPayment|Payment {
             $table = RestaurantTable::query()
                 ->lockForUpdate()
                 ->findOrFail($tableSession->table_id);
@@ -208,6 +211,100 @@ final class TableSessionPaymentService
                 409,
                 'A newer table session is already active. Close it before reopening this bill.',
             );
+
+            $recordedPayments = Payment::query()
+                ->where('table_session_id', $session->id)
+                ->whereNull('reversed_at')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($recordedPayments->isNotEmpty()) {
+                $reversedAt = now();
+                foreach ($recordedPayments as $recordedPayment) {
+                    $recordedPayment->update([
+                        'reversed_at' => $reversedAt,
+                        'reversed_by' => $manager->id,
+                        'reversal_reason' => trim($reason),
+                    ]);
+                }
+
+                $bills = Bill::query()->where('table_session_id', $session->id)
+                    ->orderBy('bill_number')->lockForUpdate()->get();
+                foreach ($bills as $bill) {
+                    $subtotal = round((float) BillItem::query()->where('bill_id', $bill->id)->sum('amount'), 2);
+                    $bill->update([
+                        'status' => 'open',
+                        'subtotal' => $subtotal,
+                        'discount' => 0,
+                        'vat_exemption' => 0,
+                        'vat' => round($subtotal * 12 / 112, 2),
+                        'total' => $subtotal,
+                        'paid_at' => null,
+                    ]);
+                }
+
+                $orders = $session->orders()->where('payment_status', 'paid')->orderBy('id')->lockForUpdate()->get();
+                foreach ($orders as $order) {
+                    $subtotal = round((float) OrderItem::query()->where('order_id', $order->id)
+                        ->whereNull('cancelled_at')->sum(DB::raw('price * quantity')), 2);
+                    $updates = [
+                        'subtotal' => $subtotal,
+                        'discount_type' => null,
+                        'discount_rate' => null,
+                        'discount_amount' => 0,
+                        'discount_cardholder_name' => null,
+                        'discount_id_number' => null,
+                        'discount_tin' => null,
+                        'vat_exemption' => 0,
+                        'vat_amount' => round($subtotal * 12 / 112, 2),
+                        'total' => $subtotal,
+                        'total_amount' => $subtotal,
+                        'payment_status' => 'unpaid',
+                        'payment_method' => null,
+                        'amount_tendered' => null,
+                        'paid_at' => null,
+                        'cashier_id' => null,
+                    ];
+                    if (Schema::hasColumn('orders', 'payment_reference')) {
+                        $updates['payment_reference'] = null;
+                    }
+                    $order->update($updates);
+                }
+
+                $subtotal = round((float) $bills->sum('subtotal'), 2);
+                $session->update([
+                    'status' => 'bill_requested',
+                    'subtotal' => $subtotal,
+                    'discount' => 0,
+                    'vat_exemption' => 0,
+                    'vat' => round($subtotal * 12 / 112, 2),
+                    'total' => $subtotal,
+                    'paid_at' => null,
+                    'paid_payment_method' => null,
+                    'paid_by' => null,
+                    'closed_at' => null,
+                    'closed_by' => null,
+                    'active_table_number' => $table->table_number,
+                    'bill_requested_at' => now(),
+                ]);
+
+                ActivityLog::query()->create([
+                    'user_id' => $manager->id,
+                    'action' => 'Paid table session reopened',
+                    'module' => 'billing',
+                    'subject_type' => TableSession::class,
+                    'subject_id' => $session->id,
+                    'metadata' => [
+                        'table_number' => $table->table_number,
+                        'original_payment_references' => $recordedPayments->pluck('payment_reference')->all(),
+                        'amount' => (float) $recordedPayments->sum('total'),
+                        'reason' => trim($reason),
+                    ],
+                ]);
+
+                return $recordedPayments->last()->fresh();
+            }
 
             $payment = $session->payments()
                 ->where('type', 'payment')

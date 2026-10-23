@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrderItem extends Model
 {
@@ -19,6 +20,7 @@ class OrderItem extends Model
         'category_name_snapshot',
         'modifier_snapshot',
         'quantity',
+        'seat_number',
         'price',
         'line_total',
         'cancelled_at',
@@ -29,6 +31,7 @@ class OrderItem extends Model
         return [
             'price' => 'decimal:2',
             'quantity' => 'integer',
+            'seat_number' => 'integer',
             'modifier_snapshot' => 'array',
             'cancelled_at' => 'datetime',
         ];
@@ -47,6 +50,11 @@ class OrderItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(MenuItemVariant::class, 'menu_item_variant_id');
+    }
+
+    public function billItems(): HasMany
+    {
+        return $this->hasMany(BillItem::class);
     }
 
     public function getItemNameAttribute(): string

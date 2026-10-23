@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const paymentMethod = form.querySelector('[data-payment-method]');
         const cashPayment = form.querySelector('[data-cash-payment]');
         const cashTendered = form.querySelector('[data-cash-tendered]');
+        const otherPayment = form.querySelector('[data-other-payment]');
+        const paymentReference = form.querySelector('[data-payment-reference]');
+        const paymentReferenceLabel = form.querySelector('[data-payment-reference-label]');
         const error = form.querySelector('[data-payment-error]');
         const vatAdded = form.dataset.vatMode === 'added';
         let calculatedTotal = vatAdded ? cents(subtotal + cents(subtotal * 0.12)) : subtotal;
@@ -37,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
             idNumber.required = hasIdDiscount;
             cashPayment.hidden = !isCash;
             cashTendered.required = isCash;
+            otherPayment.hidden = isCash;
+            paymentReference.required = !isCash;
+            paymentReferenceLabel.textContent = paymentMethod.value === 'card' ? 'Approval code' : 'GCash reference';
 
             if (!hasIdDiscount) {
                 cardholder.value = '';
@@ -45,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!isCash) cashTendered.value = '';
+            else paymentReference.value = '';
 
             if (hasIdDiscount) {
                 if (vatAdded) {

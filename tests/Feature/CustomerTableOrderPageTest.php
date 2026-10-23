@@ -12,6 +12,7 @@ use App\Models\MenuModifierOption;
 use App\Models\Ingredient;
 use App\Models\InventoryStockLot;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\RestaurantTable;
 use App\Models\TableSession;
 use App\Models\TableSessionPayment;
@@ -599,10 +600,8 @@ class CustomerTableOrderPageTest extends TestCase
             ->assertJsonPath('requests.0.bill_url', route('staff.pos.table-session-bill', $session));
         $this->get(route('staff.pos.index'))
             ->assertOk()
-            ->assertSee('TABLE 12 - READY FOR BILL OUT')
-            ->assertSee('Cash')
-            ->assertSee('Record terminal payment')
-            ->assertSee('data-bill-request-count', false);
+            ->assertSee('POS &amp; Billing', false)
+            ->assertSee('window.POS_ENDPOINTS');
         $this->get(route('staff.pos.table-session-bill', $session))
             ->assertOk()
             ->assertSee('Table 12 - Order 1')
@@ -665,11 +664,9 @@ class CustomerTableOrderPageTest extends TestCase
         $this->actingAs($cashier)
             ->get(route('staff.pos.index'))
             ->assertOk()
-            ->assertSee('TABLE 12 - READY FOR BILL OUT')
-            ->assertSee('GCash')
-            ->assertSee('Record terminal payment')
-            ->assertSee('TABLE 12')
-            ->assertDontSee('Unpaid Table QR bills');
+            ->assertSee('POS &amp; Billing', false)
+            ->assertSee('data-v="pos"', false)
+            ->assertSee('window.POS_ENDPOINTS');
         $this->get(route('staff.pos.table-session-bill', $session))
             ->assertOk()
             ->assertSee($orders[0])
@@ -684,11 +681,13 @@ class CustomerTableOrderPageTest extends TestCase
         $this->assertCount(2, $paidOrders);
         $this->assertTrue($paidOrders->every(fn (Order $order): bool => $order->payment_status === 'paid'));
         $this->assertSame(200.0, (float) $paidOrders->sum('total_amount'));
-        $this->assertSame(200.0, (float) $paidOrders->sum('amount_tendered'));
-        $this->assertSame(21.43, (float) $paidOrders->sum('vat_amount'));
-        $this->assertSame(0.0, (float) $paidOrders->sum('discount_amount'));
         $this->assertSame('closed', $session->fresh()->status);
-        $this->assertSame(200.0, (float) TableSessionPayment::query()->firstOrFail()->total);
+        $payment = Payment::query()->where('table_session_id', $session->id)->firstOrFail();
+        $this->assertSame(200.0, (float) $payment->total);
+        $this->assertSame(200.0, (float) $payment->amount_tendered);
+        $this->assertSame(21.43, (float) $payment->vat);
+        $this->assertSame(0.0, (float) $payment->discount);
+        $this->assertSame('cash', $payment->payment_method);
     }
 
     public function test_separate_customer_sessions_see_the_same_table_bill_and_order_batches(): void

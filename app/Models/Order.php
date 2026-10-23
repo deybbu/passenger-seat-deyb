@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Order extends Model
 {
@@ -43,6 +44,13 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function payments(): BelongsToMany
+    {
+        return $this->belongsToMany(Payment::class, 'payment_order')
+            ->withPivot('allocated_amount')
+            ->withTimestamps();
     }
 
     public function scopeNotHeld(Builder $query): Builder

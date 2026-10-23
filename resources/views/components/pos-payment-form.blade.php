@@ -73,6 +73,12 @@
             <p class="pos-change">Change <strong data-cash-change>₱0.00</strong></p>
         </div>
 
+        <div data-other-payment hidden>
+            <label for="{{ $formId }}-reference" data-payment-reference-label>GCash / card reference</label>
+            <input id="{{ $formId }}-reference" name="reference_number" type="text" maxlength="100"
+                   autocomplete="off" data-payment-reference>
+        </div>
+
         <p class="pos-payment-error" data-payment-error role="alert" hidden></p>
         <button type="submit" class="pos-button pos-button-primary">Confirm payment</button>
     </form>

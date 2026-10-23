@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\RestaurantTable;
 use App\Models\Role;
 use App\Models\TableSession;
@@ -134,12 +135,14 @@ class AdminAnalyticsTest extends TestCase
         ]);
 
         $this->actingAs($this->cashier)
-            ->post(route('staff.pos.table-session-paid', $session), ['payment_method' => 'gcash'])
+            ->post(route('staff.pos.table-session-paid', $session), [
+                'payment_method' => 'gcash',
+                'reference_number' => 'GC-SESSION-18',
+            ])
             ->assertRedirect(route('staff.pos.index'));
         $this->assertSame('gcash', $tableOrder->fresh()->payment_method);
-        $this->assertDatabaseHas('table_session_payments', [
+        $this->assertDatabaseHas('payments', [
             'table_session_id' => $session->id,
-            'type' => 'payment',
             'payment_method' => 'gcash',
         ]);
 

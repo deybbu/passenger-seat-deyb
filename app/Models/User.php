@@ -13,7 +13,7 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    public const ROLES = ['admin', 'kitchen', 'cashier', 'inventory'];
+    public const ROLES = ['admin', 'manager', 'kitchen', 'cashier', 'inventory'];
 
     protected $fillable = ['name', 'email', 'password', 'role', 'role_id', 'is_active'];
 
@@ -36,6 +36,16 @@ class User extends Authenticatable
     public function ordersCreated(): HasMany
     {
         return $this->hasMany(Order::class, 'cashier_id');
+    }
+
+    public function paymentsRecorded(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'cashier_id');
+    }
+
+    public function billsCreated(): HasMany
+    {
+        return $this->hasMany(Bill::class, 'created_by');
     }
 
     public function inventoryLogs(): HasMany
@@ -77,6 +87,7 @@ class User extends Authenticatable
     {
         return match ($this->role) {
             'admin' => route('admin.dashboard'),
+            'manager' => route('staff.pos.index'),
             'kitchen' => route('staff.kitchen.index'),
             'cashier' => route('staff.pos.index'),
             'inventory' => route('inventory.index'),

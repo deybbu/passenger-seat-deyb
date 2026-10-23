@@ -30,6 +30,7 @@
                 <input type="hidden" id="payment-method" name="payment_method" value="cash">
                 <div id="cashBox"><input id="tend" name="amount_tendered" value="{{ old('amount_tendered') }}" type="number" min="0" step="0.01" placeholder="Cash tendered" aria-label="Cash tendered" style="width:100%">
                     <div class="seg" id="quick"></div><div class="tot"><div><span>Change</span><b id="chg">₱0.00</b></div></div></div>
+                <div id="referenceBox" class="hide"><input id="reference" name="reference_number" value="{{ old('reference_number') }}" type="text" maxlength="100" placeholder="GCash / card reference" aria-label="GCash or card reference"></div>
                 <div class="seg"><button class="btn" id="clear" type="button">Clear</button><button class="btn" id="hold" type="button" disabled>Hold</button><button class="btn red" id="place" type="submit" disabled>Place order</button></div>
             </div>
         </section>

@@ -220,6 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('#idNo').required = isIdDiscount;
         document.querySelector('#cashBox').classList.toggle('hide', paymentMethod !== 'Cash');
         document.querySelector('#tend').required = paymentMethod === 'Cash';
+        document.querySelector('#referenceBox').classList.toggle('hide', paymentMethod === 'Cash');
+        document.querySelector('#reference').required = paymentMethod !== 'Cash';
+        if (paymentMethod === 'Cash') document.querySelector('#reference').value = '';
         document.querySelector('#chg').textContent = money(cashChange);
         document.querySelector('#tbl').classList.toggle('hide', orderType !== 'Dine-in');
         document.querySelector('#tbl').required = orderType === 'Dine-in';
@@ -228,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             || !stockValid
             || amount.total <= 0
             || (paymentMethod === 'Cash' && cents(cashTendered) < amount.total)
+            || (paymentMethod !== 'Cash' && !document.querySelector('#reference').value.trim())
             || (orderType === 'Dine-in' && !document.querySelector('#tbl').value.trim())
             || !idDiscountIsValid();
         document.querySelector('#quick').innerHTML = [
@@ -363,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCart();
     });
     document.querySelector('#q').addEventListener('input', renderMenu);
-    ['tbl', 'cust', 'tend', 'disc', 'dtype', 'idName', 'idNo', 'tin'].forEach((id) => {
+    ['tbl', 'cust', 'tend', 'reference', 'disc', 'dtype', 'idName', 'idNo', 'tin'].forEach((id) => {
         document.querySelector(`#${id}`).addEventListener('input', renderCart);
         document.querySelector(`#${id}`).addEventListener('change', renderCart);
     });
