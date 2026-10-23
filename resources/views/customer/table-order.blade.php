@@ -15,7 +15,7 @@ var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/table-order.css') }}">
+<link rel="stylesheet" href="{{ asset('css/table-order.css') }}?v={{ filemtime(public_path('css/table-order.css')) }}">
 </head>
 <body>
 @if ($invalidTable)
@@ -35,6 +35,7 @@ var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL
       <button class="table" id="tableNo" aria-label="Table number">Table {{ $tableNumber }}</button>
       <button class="basket billbtn" id="billbtn" aria-label="Request the bill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></button>
       <button class="basket" id="basket" aria-label="Open your basket"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18l-2 10a2 2 0 0 1-2 1.6H7a2 2 0 0 1-2-1.6L3 9z"/><path d="M8 9l3-5M16 9l-3-5"/><path d="M9 13v4M12 13v4M15 13v4"/></svg><span id="barCount" hidden></span></button>
+      <button class="basket kitchenbtn" id="kitchenbtn" aria-label="Live kitchen order status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 14a4 4 0 0 1-.5-7.9A4.5 4.5 0 0 1 15 5a4.5 4.5 0 0 1 2.5 8.6"/><path d="M12 13v8M8 18h8"/></svg></button>
     </header>
     <nav class="pills" id="pills" aria-label="Menu categories"></nav>
     <div class="wheel-wrap">
@@ -45,12 +46,12 @@ var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL
       </div>
     </div>
     <section class="info" id="info" aria-live="polite"></section>
+    <aside class="sheet" id="sheet" aria-label="Your order"></aside>
   </main>
 </div>
 
 
 <div class="scrim" id="scrim"></div>
-<aside class="sheet" id="sheet" aria-label="Your order"></aside>
 
 <script>
 window.PS_MENU = @js($menu);
@@ -63,7 +64,7 @@ window.PS_SESSION_ENDPOINT = @js($sessionUrl);
 window.PS_BILL_ENDPOINT = @js($billRequestUrl);
 window.PS_BILL_CANCEL_ENDPOINT = @js($billCancelUrl);
 </script>
-<script src="{{ asset('js/table-order.js') }}"></script>
+<script src="{{ asset('js/table-order.js') }}?v={{ filemtime(public_path('js/table-order.js')) }}"></script>
 
 @endif
 </body>

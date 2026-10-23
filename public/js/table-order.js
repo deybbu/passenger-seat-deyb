@@ -13,9 +13,7 @@ const PHOTOS = window.PS_PHOTOS;
 const DETAILS = window.PS_DETAILS;
 const INITIAL_MENU_ITEM_IDS = window.PS_MENU_ITEMS.map(item => Number(item.id));
 const MENU_ITEMS_BY_NAME = new Map(window.PS_MENU_ITEMS.map(item => [item.name, item]));
-const detail = it => MENU[cat][0] === "Boodle Flights"
-  ? ["A shared boodle spread. " + it[3] + " people.", it[1].split(/, | and /).map(s => s.trim())]
-  : DETAILS[it[0]] || ["", []];
+const detail = it => DETAILS[it[0]] || ["", []];
 
 /* ---------- Helpers & state ---------- */
 const $ = s => document.querySelector(s);
@@ -101,7 +99,7 @@ async function refreshSession() {
     saveSession();
     sessionSyncWarningShown = false;
     renderBar();
-    if (document.body.classList.contains("open")) renderSheet();
+    if (document.body.classList.contains("open")) view === "kitchen" ? renderKitchenSheet() : renderSheet();
   } catch (err) {
     console.error("Unable to refresh this table's running bill.", err);
     if (!sessionSyncWarningShown) {
@@ -151,6 +149,29 @@ if (cart.length !== savedCart.length) {
 }
 
 let cat = 0, items = [], N = 0, step = 45, cur = 0, tgt = 0, active = -1, opt = 0, qty = 1, raf = 0;
+let view = "cart", panelOpen = false;
+document.body.classList.add("panel-closed");
+function syncPanelButtons() {
+  $("#billbtn").classList.toggle("active", panelOpen && view === "bill");
+  $("#basket").classList.toggle("active", panelOpen && view === "cart");
+  $("#kitchenbtn").classList.toggle("active", panelOpen && view === "kitchen");
+}
+function showPanel(nextView, render) {
+  if (panelOpen && view === nextView) {
+    panelOpen = false;
+    document.body.classList.remove("open", "panel-open");
+    document.body.classList.add("panel-closed");
+    syncPanelButtons();
+    return;
+  }
+  panelOpen = true;
+  view = nextView;
+  document.body.classList.remove("panel-closed");
+  document.body.classList.add("panel-open");
+  render();
+  document.body.classList.add("open");
+  syncPanelButtons();
+}
 let scrollLocked = false, scrollLockTimer = 0, touchStart = null;
 
 function stepDish(direction) {
@@ -158,33 +179,53 @@ function stepDish(direction) {
   const current = clamp(Math.round(scrollY / STEP), 0, N - 1);
   const next = clamp(current + direction, 0, N - 1);
   if (next === current) return;
+  goToDish(next, reduce ? "auto" : "smooth");
+}
+
+function goToDish(index, behavior = "auto") {
+  const next = clamp(Number(index), 0, N - 1);
+  if (!Number.isFinite(next)) return;
+  clearTimeout(scrollLockTimer);
   scrollLocked = true;
-  window.scrollTo({ top: next * STEP, behavior: reduce ? "auto" : "smooth" });
-  scrollLockTimer = setTimeout(() => { scrollLocked = false; scrollLockTimer = 0; }, reduce ? 160 : 500);
+  tgt = next;
+  setActive(next);
+  window.scrollTo({ top: next * STEP, behavior });
+  if (!raf) raf = requestAnimationFrame(frame);
+  scrollLockTimer = setTimeout(() => { scrollLocked = false; scrollLockTimer = 0; }, behavior === "smooth" ? 700 : 120);
 }
 
 /* ---------- Categories ---------- */
 $("#pills").innerHTML = MENU.map((c, i) => `<button class="pill" data-c="${i}">${c[0]}</button>`).join("");
-$("#pills").onclick = e => { const b = e.target.closest(".pill"); if (b) build(+b.dataset.c); };
+$("#pills").onclick = e => { const b = e.target.closest(".pill"); if (b) build(+b.dataset.c, active); };
 
-function build(c) {
-  cat = c; items = MENU[c][1]; N = items.length; step = Math.min(45, 360 / N);
+function build(c, startingDish = 0) {
+  cat = c; items = MENU[c][1]; N = items.length; step = 360 / N;
+  const start = clamp(Number(startingDish) || 0, 0, N - 1);
   clearTimeout(scrollLockTimer); scrollLocked = false; touchStart = null;
-  $("#track").style.height = `calc(100svh + ${(N - 1) * STEP}px)`;
+  $("#track").style.height = `calc(100dvh + ${(N - 1) * STEP}px)`;
   $("#snaps").innerHTML = items.map((_, i) => `<i style="top:${i * STEP}px"></i>`).join("");
   $("#wheel").prepend($(".notch"));
   $("#ring").innerHTML = items.map((it, i) => `<button class="node" data-i="${i}" aria-label="${it[0]}"${PHOTOS[it[0]] ? ` style="background-image:url(${PHOTOS[it[0]]});color:transparent"` : ""}>${code(it)}</button>`).join("");
-  document.querySelectorAll(".pill").forEach((p, i) => { p.classList.toggle("on", i === c); if (i === c) p.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); });
-  $("#wheel").classList.toggle("boodle", MENU[c][0] === "Boodle Flights");
-  window.scrollTo(0, 0); cur = tgt = 0; active = -1; setActive(0); frame();
+  document.querySelectorAll(".pill").forEach((p, i) => {
+    p.classList.toggle("on", i === c);
+    if (i === c) {
+      const pills = $("#pills");
+      const left = p.offsetLeft - (pills.clientWidth - p.clientWidth) / 2;
+      pills.scrollTo({ left, behavior: reduce ? "auto" : "smooth" });
+    }
+  });
+  $("#wheel").classList.toggle("boodle", MENU[c][0] === "Solo Boodle Flights");
+  window.scrollTo({ top: start * STEP, behavior: "auto" }); cur = tgt = start; active = -1; setActive(start); frame();
 }
-$("#ring").onclick = e => { const n = e.target.closest(".node"); if (n) window.scrollTo({ top: n.dataset.i * STEP, behavior: reduce ? "auto" : "smooth" }); };
+$("#ring").onclick = e => { const n = e.target.closest(".node"); if (n) goToDish(n.dataset.i, reduce ? "auto" : "smooth"); };
 
 /* ---------- Rotating plate wheel ---------- */
 function frame() {
   const wh = $("#wheel"), bd = wh.classList.contains("boodle"), R = wh.clientWidth / 2 - 30;
-  cur += (tgt - cur) * (reduce ? 1 : 0.14);
-  if (Math.abs(tgt - cur) < 0.002) cur = tgt;
+  const nodeSize = clamp(2 * Math.max(0, R) * Math.sin(Math.PI / Math.max(N, 3)) * 0.88, 26, bd ? 62 : 58);
+  wh.style.setProperty("--node-size", `${nodeSize}px`);
+  cur += (tgt - cur) * (reduce ? 1 : 0.32);
+  if (Math.abs(tgt - cur) < 0.01) cur = tgt;
   [...$("#ring").children].forEach((n, i) => {
     const r = (i - cur) * step * Math.PI / 180, k = Math.max(0, 1 - Math.abs(i - cur));
     n.style.transform = bd
@@ -196,8 +237,12 @@ function frame() {
   raf = cur !== tgt ? requestAnimationFrame(frame) : 0;
 }
 addEventListener("scroll", () => {
-  tgt = clamp(scrollY / STEP, 0, N - 1);
-  setActive(Math.round(tgt));
+  // Programmatic dish changes already choose an exact target. Ignore the
+  // browser's intermediate smooth-scroll positions so they cannot pull the
+  // wheel back toward the previous dish during the animation.
+  if (scrollLocked) return;
+  tgt = clamp(Math.round(scrollY / STEP), 0, N - 1);
+  setActive(tgt);
   if (!raf) raf = requestAnimationFrame(frame);
 }, { passive: true });
 addEventListener("wheel", e => {
@@ -208,7 +253,7 @@ addEventListener("wheel", e => {
 }, { passive: false });
 addEventListener("touchstart", e => {
   const target = e.target;
-  touchStart = e.touches.length === 1 && !target.closest(".sheet,.scrim")
+  touchStart = e.touches.length === 1 && !target.closest(".sheet,.scrim,.info")
     ? { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontalMenu: !!target.closest(".pills") } : null;
 }, { passive: true });
 addEventListener("touchmove", e => {
@@ -236,17 +281,22 @@ function setActive(i) {
 }
 function renderInfo() {
   const it = items[active], o = optsOf(it), multi = Array.isArray(it[2]);
+  const description = detail(it)[0];
+  const ingredients = detail(it)[1].length ? detail(it)[1] : description.split(/, | and /).map(part => part.trim()).filter(Boolean);
+  const servingSize = (description.match(/Good for [^.)]+(?: persons| pax)/i) || [])[0];
+  const missingPrice = it[0] === "Italy";
   $("#code").textContent = code(it);
-  $("#catName").textContent = $("#wheel").classList.contains("boodle") ? it[3] : MENU[cat][0];
+  $("#catName").textContent = MENU[cat][0];
   const pl = $("#plate"); const ph = PHOTOS[it[0]];
   pl.classList.toggle("img", !!ph); pl.style.backgroundImage = ph ? `url(${ph})` : "";
   $("#info").innerHTML = `<h2>${it[0]}</h2>
     ${it[1] && it[1].length <= 40 ? `<div class="sub">${it[1]}</div>` : ""}
-    ${detail(it)[0] ? `<p class="desc">${detail(it)[0]}</p>` : ""}
-    ${detail(it)[1].length ? `<div class="ing"><b>Ingredients</b>${detail(it)[1].map(x => `<span>${x}</span>`).join("")}</div>` : ""}
+    ${servingSize ? `<span class="serve">${servingSize}</span>` : ""}
+    ${description ? `<p class="desc">${description}</p><details class="desc-toggle"><summary>View full description</summary><p class="full-desc">${description}</p></details>` : ""}
+    ${ingredients.length ? `<div class="ing" tabindex="0" aria-label="Menu ingredients. Scroll horizontally to see all ingredients"><b>Ingredients</b><span class="ing-hint">Swipe or scroll →</span>${ingredients.map(x => `<span>${x}</span>`).join("")}</div>` : ""}
     ${multi ? `<div class="chips">${o.map((x, j) => `<button class="chip ${j === opt ? "on" : ""}" data-o="${j}">${x[0]}</button>`).join("")}</div>` : ""}
     <div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">–</button><span>${qty}</span><button data-q="1" aria-label="More">+</button></div>
-    <button class="add" data-add><span>Add to order</span><span>${peso(o[opt][1] * qty)}</span></button></div>`;
+    ${missingPrice ? `<button class="add" disabled>Price not provided</button>` : `<button class="add" data-add><span>Add to order</span><span>${peso(o[opt][1] * qty)}</span></button>`}</div>`;
 }
 $("#info").onclick = e => {
   const t = e.target.closest("button"); if (!t) return;
@@ -285,7 +335,7 @@ const total = () => cart.reduce((s, l) => s + l.qty * l.price, 0);
 function renderBar() {
   $("#basket").classList.toggle("has", count() > 0);
   $("#billbtn").classList.toggle("has", !!session.bill);
-  if (DESK.matches) renderSheet();
+  if (DESK.matches) view === "kitchen" && panelOpen ? renderKitchenSheet() : renderSheet();
   $("#barCount").textContent = count(); $("#barCount").hidden = !count();
   $("#basket").title = count() + " in your basket · " + peso(total());
 }
@@ -310,13 +360,28 @@ function renderSheet(d) {
   <div class="row"><span>Total</span><span>${peso(total())}</span></div>
   <button class="add" data-place style="width:100%;margin-top:14px;justify-content:center" ${cart.length ? "" : "disabled"}>Place order</button>${billBlock()}`;
 }
+const kitchenStatus = status => ({pending:"Received",received:"Received",preparing:"Preparing",ready:"Ready to Serve",completed:"Served",served:"Served",cancelled:"Cancelled"}[String(status || "pending").toLowerCase()] || "Received");
+function renderKitchenSheet() {
+  const steps = ["Received", "Preparing", "Ready to Serve", "Served"];
+  const s = $("#sheet");
+  s.innerHTML = `<h3>Live Kitchen <button data-close aria-label="Close" style="font-size:28px">×</button></h3>
+    <p class="ksub"><span class="live"></span>Table ${table} · Live updates every 3 seconds</p>
+    ${session.orders.length ? [...session.orders].reverse().map(order => {
+      const state = kitchenStatus(order.status), current = Math.max(0, steps.indexOf(state));
+      return `<article class="kitchen-order"><div class="oc-h"><span><b>Order ${order.batch}</b><em>${order.ref}</em></span><span class="status-badge ${state.toLowerCase().replaceAll(' ', '-')}">${state}</span></div>
+        <p class="kitchen-items">${order.items.map(item => `${item.quantity}× ${item.name}`).join(", ")}</p>
+        ${state === "Cancelled" ? "" : `<ol class="steps ${state.toLowerCase().replaceAll(' ', '-')}" aria-label="Order progress">${steps.map((label, i) => `<li class="${i < current ? "done" : i === current ? "now" : ""}">${label}</li>`).join("")}</ol>`}</article>`;
+    }).join("") : `<p class="kitchen-empty">No orders yet. Place an order to follow its progress here.</p>`}`;
+}
 $("#billbtn").onclick = () => {
+  if (panelOpen && view === "bill") return showPanel("bill", renderSheet);
   if (!(session.orderCount ?? session.orders.length) && !session.bill) { alert("Place an order first, then you can request the bill here."); return; }
-  confirmed = null; renderSheet(); document.body.classList.add("open");
+  confirmed = null; showPanel("bill", renderSheet);
   setTimeout(() => { const b = $("#billsec"); if (b) b.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" }); }, 60);
 };
-$("#basket").onclick = () => { renderSheet(); document.body.classList.add("open"); };
-$("#scrim").onclick = () => { confirmed = null; document.body.classList.remove("open"); };
+$("#basket").onclick = () => { confirmed = null; showPanel("cart", renderSheet); };
+$("#kitchenbtn").onclick = () => { confirmed = null; showPanel("kitchen", renderKitchenSheet); };
+$("#scrim").onclick = () => { confirmed = null; panelOpen = false; view = "cart"; document.body.classList.remove("open", "panel-open"); document.body.classList.add("panel-closed"); syncPanelButtons(); };
 $("#sheet").onclick = async e => {
   const t = e.target.closest("button"); if (!t) return;
   if (t.dataset.mop) { mop = t.dataset.mop; renderSheet(); const b = $("#billsec"); if (b) b.scrollIntoView({ block: "nearest" }); }
@@ -352,7 +417,7 @@ $("#sheet").onclick = async e => {
   else if ("reset" in t.dataset) {
     if (confirm("Start a new table session? The current orders will be cleared from this phone.")) { session = { table, orders: [], bill: null }; mop = null; saveSession(); renderBar(); renderSheet(); }
   }
-  else if ("close" in t.dataset) { confirmed = null; document.body.classList.remove("open"); if (DESK.matches) renderSheet(); }
+  else if ("close" in t.dataset) { confirmed = null; panelOpen = false; view = "cart"; document.body.classList.remove("open", "panel-open"); document.body.classList.add("panel-closed"); syncPanelButtons(); if (DESK.matches) renderSheet(); }
   else if (t.dataset.l) { const l = cart[+t.dataset.l]; l.qty += +t.dataset.d; if (l.qty < 1) cart.splice(+t.dataset.l, 1); saveCart(); renderBar(); renderSheet(); }
   else if ("place" in t.dataset) {
     if (orderSubmitting) return;
@@ -397,16 +462,19 @@ $("#sheet").onclick = async e => {
 };
 
 $("#sheet").addEventListener("input", e => { if (e.target.id === "notes") notesVal = e.target.value; });
-function placeSheet() { // desktop: pin the order panel inside the stage's right-hand column
+function placeSheet() { // the desktop order panel occupies the third grid column
   const s = $("#sheet");
-  if (!DESK.matches) { s.style.right = s.style.top = s.style.bottom = ""; return; }
-  const r = $(".stage").getBoundingClientRect(), h = $("header").getBoundingClientRect();
-  s.style.right = (document.documentElement.clientWidth - r.right + 28) + "px";
-  s.style.top = (h.bottom + 8) + "px";
-  s.style.bottom = (innerHeight - r.bottom + 24) + "px";
+  s.style.left = s.style.right = s.style.top = s.style.bottom = "";
 }
 addEventListener("resize", placeSheet);
-DESK.addEventListener("change", () => { document.body.classList.remove("open"); renderSheet(); placeSheet(); frame(); });
+DESK.addEventListener("change", () => {
+  document.body.classList.remove("open", "panel-open");
+  view = "cart";
+  panelOpen = false;
+  document.body.classList.toggle("panel-closed", !DESK.matches);
+  syncPanelButtons();
+  renderSheet(); placeSheet(); frame();
+});
 
 /* ---------- Init + PWA ---------- */
 let orderSubmitting = false, pendingOrderKey = null;
@@ -422,4 +490,4 @@ function newIdempotencyKey() {
 }
 renderBar(); build(0); placeSheet(); if (document.fonts) document.fonts.ready.then(placeSheet);
 refreshSession();
-setInterval(refreshSession, 15000);
+setInterval(refreshSession, 3000);

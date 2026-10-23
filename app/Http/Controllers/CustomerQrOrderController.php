@@ -111,7 +111,6 @@ class CustomerQrOrderController extends Controller
         $items = CustomerMenuItemResource::collection($menuItems)->resolve();
         $menu = collect($items)
             ->groupBy('category')
-            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)
             ->map(fn ($categoryItems, $category): array => [
                 $category,
                 $categoryItems->pluck('reference_item')->all(),
@@ -551,7 +550,8 @@ class CustomerQrOrderController extends Controller
             ->where(fn ($query) => $query
                 ->whereDoesntHave('category')
                 ->orWhereHas('category', fn ($category) => $category->where('is_active', true)))
-            ->orderBy('name')
+            ->orderBy('menu_category_id')
+            ->orderBy('id')
             ->get()
             ->filter(fn (MenuItem $item): bool => $item->isOrderable()
                 && ($item->variants->isEmpty() || $item->variants->contains('is_active', true))
