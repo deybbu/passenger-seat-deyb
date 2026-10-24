@@ -46,13 +46,23 @@ class DashboardController extends Controller
 
         return response()->json([
             'menu' => MenuItem::query()
-                ->with(['category', 'ingredients', 'variants', 'tags', 'modifierGroups.options', 'bundles'])
+                ->withStockAvailability()
+                ->with(['category', 'variants', 'tags', 'modifierGroups.options', 'bundles'])
                 ->orderBy('id')
                 ->get()
                 ->map(fn (MenuItem $item): array => $this->referenceMenuItem($item))
                 ->values(),
             'ingredients' => Ingredient::query()
-                ->with(['stockLots', 'preparationRecipeLines'])
+                ->usedByCurrentMenu()
+                ->with([
+                    'stockLots' => fn ($query) => $query
+                        ->where('remaining_quantity', '>', 0)
+                        ->orderBy('received_at')
+                        ->orderByRaw('CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('expires_at')
+                        ->orderBy('id'),
+                    'preparationRecipeLines',
+                ])
                 ->orderBy('id')
                 ->get()
                 ->map(fn (Ingredient $ingredient): array => $this->referenceIngredient($ingredient))
@@ -87,12 +97,14 @@ class DashboardController extends Controller
             'purchase_orders' => PurchaseOrder::query()->with('items')->latest()->limit(100)->get()
                 ->flatMap(fn (PurchaseOrder $order) => $order->items->map(fn ($item): array => [
                     'no' => $order->reference,
+                      'order' => (string) $order->id,
                     'sup' => $order->supplier_name,
                     'id' => $item->ingredient_id,
                     'item' => $item->id,
                     'ord' => (float) $item->ordered_quantity,
                     'rec' => (float) $item->received_quantity,
                     'closed' => $order->closed_at !== null,
+                      'status' => $order->status,
                 ]))->values(),
             'lots' => InventoryStockLot::query()->with('ingredient')->latest('received_at')->limit(100)->get()
                 ->map(fn (InventoryStockLot $lot): array => [
@@ -222,6 +234,10 @@ class DashboardController extends Controller
                 'no' => $order->reference_number ?: $order->id,
                 'items' => $order->items->map(fn (OrderItem $item): array => [
                     'id' => $item->menu_item_id,
+                    'n' => $item->item_name,
+                    'vn' => $item->variant_name_snapshot,
+                    'c' => $item->category_name_snapshot,
+                    'mo' => collect($item->modifier_snapshot)->pluck('name')->filter()->values(),
                     'q' => (int) $item->quantity,
                     'vi' => $item->menu_item_variant_id,
                     'pr' => (float) $item->price,
@@ -234,8 +250,8 @@ class DashboardController extends Controller
                     : ($order->table_session_id ? 'QR' : 'POS'),
                 'paym' => $recordedMethods !== '' ? $recordedMethods : $order->payment_method,
                 'paymentStatus' => $order->payment_status,
-                'revenue' => $order->isPaid() || $order->status === 'completed',
-                'revenueToday' => ($order->isPaid() || $order->status === 'completed')
+                'revenue' => $order->isPaid() || $order->status === 'served',
+                'revenueToday' => ($order->isPaid() || $order->status === 'served')
                     && ($order->created_at?->isToday() ?? false),
                 'customer' => $order->customer_name,
                 'tableNo' => $order->table_number,
@@ -253,6 +269,7 @@ class DashboardController extends Controller
             'p' => (float) $item->price,
             't' => $item->collection_type ?? 'Regular',
             'on' => $item->is_active && $item->is_available && $item->archived_at === null,
+            'orderable' => $item->isOrderable(),
             'img' => $item->image_path ? asset('storage/'.$item->image_path) : '',
             'desc' => $item->description ?? '',
             'tags' => $item->tags->pluck('name')->values(),
@@ -315,9 +332,9 @@ class DashboardController extends Controller
             if (Schema::hasColumn('orders', 'payment_status')) {
                 $query->where(fn ($orders) => $orders
                     ->where('payment_status', 'paid')
-                    ->orWhere('status', 'completed'));
+                    ->orWhere('status', 'served'));
             } else {
-                $query->where('status', 'completed');
+                $query->where('status', 'served');
             }
 
             return (float) $query->sum($totalColumn);
@@ -505,6 +522,11 @@ class DashboardController extends Controller
                     ?? 'Uncategorized';
                 $categoryCents[$category] = ($categoryCents[$category] ?? 0) + $itemCents;
 
+                $currentMenuItem = $item->menuItem;
+                if ($currentMenuItem === null || ! $currentMenuItem->is_active || $currentMenuItem->archived_at !== null) {
+                    continue;
+                }
+
                 $productKey = trim((string) $item->item_name) ?: 'Unitemized item';
                 $productTotals[$productKey] ??= ['name' => $productKey, 'units' => 0, 'cents' => 0];
                 $productTotals[$productKey]['units'] += (int) $item->quantity;
@@ -519,7 +541,7 @@ class DashboardController extends Controller
         if ($productRows->count() > 5) {
             $otherProducts = $productRows->slice(5);
             $topProducts[] = [
-                'name' => 'Other items',
+                'name' => 'Other menu items',
                 'units' => (int) $otherProducts->sum('units'),
                 'cents' => (int) $otherProducts->sum('cents'),
             ];
@@ -592,9 +614,9 @@ class DashboardController extends Controller
         if (Schema::hasColumn('orders', 'payment_status')) {
             $activeOrders->where(fn ($orders) => $orders
                 ->where('payment_status', 'paid')
-                ->orWhere('status', 'completed'));
+                ->orWhere('status', 'served'));
         } else {
-            $activeOrders->where('status', 'completed');
+            $activeOrders->where('status', 'served');
         }
         $periodOrders = (clone $activeOrders)->whereBetween('created_at', [$periodStart, $periodEnd]);
         $revenue = (float) (clone $periodOrders)->sum($totalCol);
@@ -605,7 +627,7 @@ class DashboardController extends Controller
             ->whereDate('created_at', $today)
             ->sum($totalCol);
 
-        $statusNames = ['pending', 'preparing', 'ready', 'completed', 'cancelled'];
+        $statusNames = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
         $orderStatusCounts = collect($statusNames)->mapWithKeys(
             fn (string $status): array => [$status => Order::query()->notHeld()->where('status', $status)->count()],
         );
@@ -676,6 +698,7 @@ class DashboardController extends Controller
         }
 
         $lowStockItems = Ingredient::query()
+            ->usedByCurrentMenu()
             ->withUsableStock()
             ->get()
             ->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock())
@@ -745,7 +768,7 @@ class DashboardController extends Controller
 
     public function inventory(): View
     {
-        $ingredients = Ingredient::query()->orderBy('name')->get();
+        $ingredients = Ingredient::query()->usedByCurrentMenu()->orderBy('name')->get();
 
         return view('admin.inventory', compact('ingredients'));
     }
@@ -757,7 +780,7 @@ class DashboardController extends Controller
         if (Schema::hasColumn('orders', 'payment_status')) {
             $query->where('payment_status', 'paid');
         } else {
-            $query->where('status', 'completed');
+            $query->where('status', 'served');
         }
 
         $paidCol = Schema::hasColumn('orders', 'paid_at') ? 'paid_at' : 'updated_at';
@@ -776,7 +799,7 @@ class DashboardController extends Controller
 
     public function barcode(): View
     {
-        $ingredients = Ingredient::query()->orderBy('name')->get();
+        $ingredients = Ingredient::query()->usedByCurrentMenu()->orderBy('name')->get();
 
         return view('admin.barcode', compact('ingredients'));
     }

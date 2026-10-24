@@ -24,7 +24,7 @@
             <label for="status">Order status</label>
             <select id="status" name="status">
                 <option value="">All</option>
-                @foreach (['pending', 'preparing', 'ready', 'completed', 'cancelled'] as $status)
+                @foreach (['pending', 'preparing', 'ready', 'served', 'cancelled'] as $status)
                     <option value="{{ $status }}" @selected(request('status') === $status)>{{ str($status)->headline() }}</option>
                 @endforeach
             </select>

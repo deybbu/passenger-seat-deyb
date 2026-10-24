@@ -58,7 +58,7 @@
             @if (auth()->user()->hasRole('cashier'))
                 <form method="POST" action="{{ route('staff.orders.complete', $order) }}">
                     @csrf @method('PATCH')
-                    <button type="submit" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Mark completed</button>
+                    <button type="submit" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Mark Served</button>
                 </form>
                 <form method="POST" action="{{ route('staff.orders.transition', $order) }}" onsubmit="return confirm('Cancel {{ $order->reference_number }}? Consumed ingredients will be restored to stock.')">
                     @csrf @method('PATCH')

@@ -108,8 +108,8 @@ class Order extends Model
         $allowed = [
             'pending' => ['preparing', 'cancelled'],
             'preparing' => ['ready', 'cancelled'],
-            'ready' => ['completed', 'cancelled'],
-            'completed' => [],
+            'ready' => ['served', 'cancelled'],
+            'served' => [],
             'cancelled' => [],
         ];
 
@@ -121,7 +121,7 @@ class Order extends Model
         return match ($this->status) {
             'pending' => 'preparing',
             'preparing' => 'ready',
-            'ready' => 'completed',
+            'ready' => 'served',
             default => null,
         };
     }

@@ -84,6 +84,10 @@ class MenuItem extends Model
             $ingredients = $this->getRelation('ingredients');
         }
 
+        if ($ingredients->isEmpty()) {
+            return false;
+        }
+
         return $ingredients->every(
             fn (Ingredient $ingredient): bool => min(
                 (float) $ingredient->current_stock,

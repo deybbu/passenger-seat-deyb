@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Ingredient;
 use App\Models\InventoryLog;
 use App\Models\InventoryPackage;
+use App\Models\InventoryReceipt;
 use App\Models\InventoryStockLot;
 use App\Models\Order;
 use App\Models\OrderIngredientReservation;
@@ -50,9 +51,21 @@ final class InventoryService
         return $needs;
     }
 
-    /** Reserve recipe stock for a pending order without reducing physical stock. */
+    /** Reserve recipe stock while validating an order before consuming its FIFO lots. */
     public function reserveForOrder(Order $order, Collection $lines): void
     {
+        $unconfigured = $lines
+            ->filter(fn ($line) => $line->item->ingredients->isEmpty())
+            ->map(fn ($line) => $line->item->name)
+            ->unique()
+            ->values();
+
+        if ($unconfigured->isNotEmpty()) {
+            throw new \DomainException(
+                'Recipe not configured for: ' . $unconfigured->implode(', ') . '. Please add a recipe before taking this order.'
+            );
+        }
+
         $off = $lines->filter(fn ($line) => ! $line->item->isOrderable())->map(fn ($line) => $line->item->name);
 
         if ($off->isNotEmpty()) {
@@ -156,8 +169,8 @@ final class InventoryService
         }
     }
 
-    /** Release unconsumed reservations or restore consumed ingredients when an order is cancelled. */
-    public function releaseOrRestoreForCancelledOrder(Order $order, ?User $actor): void
+    /** Release pending reservations, restore pre-preparation cancellations, or record prepared stock as waste. */
+    public function releaseOrRestoreForCancelledOrder(Order $order, ?User $actor, bool $restoreConsumed = true): void
     {
         $ingredientIds = $order->ingredientReservations()
             ->whereIn('status', ['reserved', 'consumed'])
@@ -189,6 +202,42 @@ final class InventoryService
                 throw new \DomainException("Consumed ingredient {$reservation->ingredient_name} no longer exists.");
             }
 
+            if (! $restoreConsumed) {
+                $logs = InventoryLog::query()
+                    ->with('stockLot')
+                    ->where('order_id', $order->id)
+                    ->where('ingredient_id', $ingredient->id)
+                    ->where('type', 'stock_out')
+                    ->whereNotNull('stock_lot_id')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($logs->isEmpty()) {
+                    throw new \DomainException(
+                        "Stock history for {$reservation->ingredient_name} is missing; the order cannot be cancelled safely."
+                    );
+                }
+
+                foreach ($logs as $log) {
+                    $unitCost = $log->stockLot?->unit_cost ?? $ingredient->unit_cost;
+                    $quantity = abs((float) $log->quantity);
+                    $log->update([
+                        'user_id' => $actor?->id,
+                        'type' => 'waste',
+                        'quantity' => -$quantity,
+                        'notes' => 'Order ' . $order->reference_number . ' cancelled after preparation started.',
+                        'reason' => 'Order cancelled after preparation began',
+                        'stage' => 'Prep / production',
+                        'cost_amount' => $unitCost === null ? null : round($quantity * (float) $unitCost, 4),
+                        'created_at' => now(),
+                    ]);
+                }
+                $reservation->update(['status' => 'wasted']);
+
+                continue;
+            }
+
             $this->restoreConsumedLots(
                 $ingredient,
                 (float) $reservation->quantity,
@@ -208,7 +257,7 @@ final class InventoryService
     {
         $package = InventoryPackage::query()
             ->with('ingredient')
-            ->where('barcode', $barcode)
+            ->where(fn ($query) => $query->where('barcode', $barcode)->orWhere('manual_entry_code', $barcode))
             ->where('is_active', true)
             ->first();
 
@@ -219,6 +268,176 @@ final class InventoryService
         $ingredient = Ingredient::query()->where('barcode', $barcode)->first();
 
         return $ingredient === null ? null : ['ingredient' => $ingredient, 'package' => null];
+    }
+
+    /** Confirm a receipt only for a registered package identifier, using server-side unit conversion. */
+    public function receiveRegisteredPackage(
+        string $code,
+        string $manualCode,
+        float $enteredQuantity,
+        string $enteredUnit,
+        ?float $conversionFactor,
+        string $receiptToken,
+        string $batchNumber,
+        string $expiresAt,
+        string $storageZone,
+        ?string $scannedAt,
+        ?string $manufacturer,
+        ?string $serialNumber,
+        ?string $storageBin,
+        ?int $purchaseOrderItemId,
+        User $actor,
+    ): array {
+        return DB::transaction(function () use (
+            $code, $manualCode, $enteredQuantity, $enteredUnit, $conversionFactor,
+            $receiptToken, $batchNumber, $expiresAt, $storageZone, $scannedAt,
+            $manufacturer, $serialNumber, $storageBin, $purchaseOrderItemId, $actor,
+        ): array {
+            $package = InventoryPackage::query()
+                ->where(fn ($query) => $query->where('barcode', $code)->orWhere('manual_entry_code', $code))
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+            if ($package === null || ($manualCode !== $package->manual_entry_code && $manualCode !== $package->barcode)) {
+                throw new \DomainException('This code does not match an active registered package.');
+            }
+            $retry = InventoryReceipt::query()
+                ->with(['stockLot.ingredient', 'stockLot.package', 'stockLot.purchaseOrderItem.purchaseOrder'])
+                ->where('idempotency_key', $receiptToken)
+                ->first();
+            if ($retry !== null) {
+                if ((int) $retry->package_id !== (int) $package->id || $retry->stockLot === null) {
+                    throw new \DomainException('This idempotency key belongs to another receipt.', 409);
+                }
+                $savedLot = $retry->stockLot;
+                $savedIngredient = Ingredient::query()->findOrFail($savedLot->ingredient_id);
+                $savedLog = InventoryLog::query()->with('user')->where('stock_lot_id', $savedLot->id)->where('type', 'stock_in')->latest('id')->first();
+                $savedLine = $savedLot->purchaseOrderItem;
+                return [
+                    'ingredient' => $savedIngredient,
+                    'lot' => $savedLot,
+                    'log' => $savedLog,
+                    'current_stock' => max(0, round((float) $savedIngredient->current_stock - (float) $savedLot->received_quantity, 3)),
+                    'package_quantity' => (float) $savedLot->received_quantity,
+                    'expected_stock' => (float) $savedIngredient->current_stock,
+                    'receipt' => $retry,
+                    'purchase_order_item' => $savedLine,
+                    'purchase_order' => $savedLine?->purchaseOrder,
+                    'replayed' => true,
+                ];
+            }
+            if (InventoryReceipt::query()->where('package_id', $package->id)->exists()) {
+                $existing = InventoryReceipt::query()->where('package_id', $package->id)->value('received_at');
+                throw new \DomainException('This package was already received'.($existing ? ' on '.(string) $existing : '').'.', 409);
+            }
+            if (InventoryStockLot::query()->where('package_id', $package->id)->exists()) {
+                throw new \DomainException('This package already has a recorded receiving lot.', 409);
+            }
+            if (InventoryReceipt::query()->where('idempotency_key', $receiptToken)->exists()
+                || InventoryStockLot::query()->where('receipt_token', $receiptToken)->exists()) {
+                throw new \DomainException('This receipt was already confirmed. Scan the package again for a new delivery.', 409);
+            }
+
+            $ingredient = Ingredient::query()->lockForUpdate()->findOrFail($package->ingredient_id);
+            $quantity = $this->convertInventoryQuantity($enteredQuantity, $enteredUnit, (string) $ingredient->unit, $conversionFactor);
+
+            $orderItem = null;
+            $purchaseOrder = null;
+            if ($purchaseOrderItemId !== null) {
+                $orderItem = PurchaseOrderItem::query()->lockForUpdate()->findOrFail($purchaseOrderItemId);
+                $purchaseOrder = PurchaseOrder::query()->lockForUpdate()->findOrFail($orderItem->purchase_order_id);
+                if ((int) $orderItem->ingredient_id !== (int) $ingredient->id
+                    || ! in_array($purchaseOrder->status, ['open', 'partial'], true)
+                    || $purchaseOrder->closed_at !== null
+                    || ($purchaseOrder->storage_zone && $purchaseOrder->storage_zone !== $storageZone)) {
+                    throw new \DomainException('This purchase order is not open for this package.', 409);
+                }
+                $balance = round((float) $orderItem->ordered_quantity - (float) $orderItem->received_quantity, 3);
+                if ($quantity > $balance + self::EPSILON) {
+                    throw new \DomainException('Over-delivery: the received quantity cannot exceed the '.number_format(max(0, $balance), 3).' remaining on this purchase order.');
+                }
+            }
+
+            $scanTime = $scannedAt
+                ? \Illuminate\Support\Carbon::parse($scannedAt)->timezone(config('app.timezone', 'Asia/Manila'))
+                : now();
+            $receivedAt = now();
+            $receipt = InventoryReceipt::query()->create([
+                'package_id' => $package->id,
+                'idempotency_key' => $receiptToken,
+                'status' => 'received',
+                'scanned_by' => $actor->id,
+                'scanned_at' => $scanTime,
+                'received_by' => $actor->id,
+                'received_at' => $receivedAt,
+            ]);
+
+            $recorded = $this->recordPackageReceipt(
+                $ingredient,
+                $package,
+                $quantity,
+                $package->barcode,
+                $receiptToken,
+                $batchNumber,
+                $expiresAt,
+                $storageZone,
+                $actor,
+                $ingredient->unit_cost === null ? null : (float) $ingredient->unit_cost,
+                false,
+                $orderItem?->id,
+                null,
+                "Scanned at {$scanTime->toIso8601String()}; received at {$receivedAt->toIso8601String()}; package {$package->barcode}; batch {$batchNumber}; expires {$expiresAt}; stored in {$storageZone}.",
+                $receipt->id,
+                $scanTime->toDateTimeString(),
+                $manufacturer,
+                $serialNumber,
+                $storageBin,
+            );
+
+            if ($orderItem !== null && $purchaseOrder !== null) {
+                $orderItem->update(['received_quantity' => round((float) $orderItem->received_quantity + $quantity, 3)]);
+                $orderItems = PurchaseOrderItem::query()->where('purchase_order_id', $purchaseOrder->id)->get(['ordered_quantity', 'received_quantity']);
+                $complete = $orderItems->isNotEmpty() && $orderItems->every(fn (PurchaseOrderItem $line): bool => (float) $line->received_quantity >= (float) $line->ordered_quantity);
+                $anyReceived = $orderItems->contains(fn (PurchaseOrderItem $line): bool => (float) $line->received_quantity > 0);
+                $purchaseOrder->update([
+                    'status' => $complete ? 'completed' : ($anyReceived ? 'partial' : 'open'),
+                    'closed_at' => $complete ? now() : null,
+                ]);
+                $orderItem->refresh();
+                $purchaseOrder->refresh();
+            }
+
+            return [...$recorded, 'receipt' => $receipt, 'purchase_order_item' => $orderItem, 'purchase_order' => $purchaseOrder];
+        });
+    }
+
+    private function convertInventoryQuantity(float $quantity, string $fromUnit, string $toUnit, ?float $factor): float
+    {
+        if ($quantity <= 0) {
+            throw new \DomainException('Received quantity must be greater than zero.');
+        }
+        if ($fromUnit === $toUnit) {
+            return round($quantity, 3);
+        }
+        $groups = [
+            'kg' => ['kg' => 1.0, 'g' => 0.001], 'g' => ['kg' => 1000.0, 'g' => 1.0],
+            'L' => ['L' => 1.0, 'mL' => 0.001], 'mL' => ['L' => 1000.0, 'mL' => 1.0],
+            'pc' => ['pc' => 1.0, 'pcs' => 1.0, 'can' => 1.0],
+            'pcs' => ['pc' => 1.0, 'pcs' => 1.0, 'can' => 1.0],
+            'can' => ['pc' => 1.0, 'pcs' => 1.0, 'can' => 1.0],
+        ];
+        if (isset($groups[$fromUnit][$toUnit])) {
+            return round($quantity * $groups[$fromUnit][$toUnit], 3);
+        }
+        if (in_array($fromUnit, ['pack / bag', 'pack', 'bag'], true) && $factor !== null && $factor > 0) {
+            return round($quantity * $factor, 3);
+        }
+        throw new \DomainException("Cannot convert {$fromUnit} to {$toUnit}; provide a pack base-unit factor when receiving packs or bags.");
+    }
+
+    public function convertReceiptQuantity(float $quantity, string $fromUnit, string $toUnit, ?float $factor): float
+    {
+        return $this->convertInventoryQuantity($quantity, $fromUnit, $toUnit, $factor);
     }
 
     /** Calculate receipt quantities from current server-side stock and registered package data. */
@@ -274,7 +493,7 @@ final class InventoryService
             }
 
             $package = InventoryPackage::query()
-                ->where('barcode', $barcode)
+                ->where(fn ($query) => $query->where('barcode', $barcode)->orWhere('manual_entry_code', $barcode))
                 ->where('is_active', true)
                 ->lockForUpdate()
                 ->first();
@@ -284,6 +503,10 @@ final class InventoryService
 
             if ($ingredient === null) {
                 throw new \DomainException('This barcode is not registered to an active package or ingredient.');
+            }
+            if ($package !== null && (InventoryReceipt::query()->where('package_id', $package->id)->exists()
+                || InventoryStockLot::query()->where('package_id', $package->id)->exists())) {
+                throw new \DomainException('This package has already been received.', 409);
             }
 
             $quantity = $package !== null ? (float) $package->package_quantity : $manualQuantity;
@@ -296,7 +519,7 @@ final class InventoryService
                 $ingredient,
                 $package,
                 round($quantity, 3),
-                $barcode,
+                $package?->barcode ?? $barcode,
                 $receiptToken,
                 $batchNumber,
                 $expiresAt,
@@ -351,7 +574,7 @@ final class InventoryService
             }
 
             $package = InventoryPackage::query()
-                ->where('barcode', $barcode)
+                ->where(fn ($query) => $query->where('barcode', $barcode)->orWhere('manual_entry_code', $barcode))
                 ->where('is_active', true)
                 ->lockForUpdate()
                 ->first();
@@ -362,8 +585,18 @@ final class InventoryService
             if ($ingredient === null) {
                 throw new \DomainException('This barcode is not registered to an active package or ingredient.');
             }
+            if ($package === null) {
+                throw new \DomainException('Purchase-order receiving requires a registered package QR code.');
+            }
             if ((int) $orderItem->ingredient_id !== (int) $ingredient->id) {
                 throw new \DomainException('The scanned item does not match this purchase-order line.');
+            }
+            if (InventoryReceipt::query()->where('package_id', $package->id)->exists()
+                || InventoryStockLot::query()->where('package_id', $package->id)->exists()) {
+                throw new \DomainException('This package has already been received.', 409);
+            }
+            if (InventoryReceipt::query()->where('idempotency_key', $receiptToken)->exists()) {
+                throw new \DomainException('This receipt was already confirmed.', 409);
             }
 
             $remaining = round((float) $orderItem->ordered_quantity - (float) $orderItem->received_quantity, 3);
@@ -383,11 +616,20 @@ final class InventoryService
             $unitCost = $invoiceUnitCost === null
                 ? ($ingredient->unit_cost === null ? null : (float) $ingredient->unit_cost)
                 : round($invoiceUnitCost, 4);
+            $receiptRecord = InventoryReceipt::query()->create([
+                'package_id' => $package->id,
+                'idempotency_key' => $receiptToken,
+                'status' => 'received',
+                'scanned_by' => $actor->id,
+                'scanned_at' => now(),
+                'received_by' => $actor->id,
+                'received_at' => now(),
+            ]);
             $receipt = $this->recordPackageReceipt(
                 $ingredient,
                 $package,
                 $quantity,
-                $barcode,
+                $package->barcode,
                 $receiptToken,
                 trim($batchNumber),
                 $expiresAt,
@@ -398,6 +640,8 @@ final class InventoryService
                 $orderItem->id,
                 trim($invoiceNumber),
                 "Received barcode {$barcode} against {$purchaseOrder->reference}; invoice {$invoiceNumber}; batch {$batchNumber}; expires {$expiresAt}.",
+                $receiptRecord->id,
+                $receiptRecord->scanned_at?->toDateTimeString(),
             );
 
             $orderItem->update([
@@ -818,6 +1062,11 @@ final class InventoryService
         ?int $purchaseOrderItemId,
         ?string $invoiceNumber,
         string $notes,
+        ?int $receiptId = null,
+        ?string $scannedAt = null,
+        ?string $manufacturer = null,
+        ?string $serialNumber = null,
+        ?string $storageBin = null,
     ): array {
         $quantity = round($quantity, 3);
         $before = round((float) $ingredient->current_stock, 3);
@@ -840,14 +1089,19 @@ final class InventoryService
             'remaining_quantity' => $quantity,
             'unit_cost' => $lotUnitCost,
             'receipt_token' => $receiptToken,
+            'receipt_id' => $receiptId,
             'received_by' => $actor->id,
             'received_at' => now(),
+            'scanned_at' => $scannedAt,
             'storage_zone' => $storageZone !== null && trim($storageZone) !== '' ? trim($storageZone) : null,
+            'manufacturer' => $manufacturer !== null ? mb_substr(trim($manufacturer), 0, 120) : null,
+            'serial_number' => $serialNumber !== null ? mb_substr(trim($serialNumber), 0, 120) : null,
+            'storage_bin' => $storageBin !== null ? mb_substr(trim($storageBin), 0, 80) : null,
             'purchase_order_item_id' => $purchaseOrderItemId,
             'supplier_invoice_number' => $invoiceNumber,
         ]);
 
-        InventoryLog::create([
+        $log = InventoryLog::create([
             'ingredient_id' => $ingredient->id,
             'stock_lot_id' => $lot->id,
             'user_id' => $actor->id,
@@ -861,6 +1115,7 @@ final class InventoryService
         return [
             'ingredient' => $ingredient,
             'lot' => $lot,
+            'log' => $log,
             'current_stock' => $before,
             'package_quantity' => $quantity,
             'expected_stock' => $after,
@@ -909,6 +1164,7 @@ final class InventoryService
                 ->where('ingredient_id', $ingredient->id)
                 ->where('remaining_quantity', '>', 0)
                 ->where(fn ($query) => $query->whereNull('expires_at')->orWhereDate('expires_at', '>=', today()))
+                ->orderBy('received_at')
                 ->orderByRaw('CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END')
                 ->orderBy('expires_at')
                 ->orderBy('id')

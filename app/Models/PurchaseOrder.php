@@ -16,6 +16,9 @@ class PurchaseOrder extends Model
         'status',
         'invoice_number',
         'created_by',
+        'storage_zone',
+        'approved_by',
+        'approved_at',
         'ordered_at',
         'expected_at',
         'closed_at',
@@ -28,6 +31,7 @@ class PurchaseOrder extends Model
             'ordered_at' => 'datetime',
             'expected_at' => 'date',
             'closed_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 
@@ -39,5 +43,10 @@ class PurchaseOrder extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }

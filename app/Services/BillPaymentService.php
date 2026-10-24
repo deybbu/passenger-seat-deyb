@@ -10,6 +10,7 @@ use App\Models\BillItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\RestaurantTable;
 use App\Models\TableSession;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -244,6 +245,7 @@ final class BillPaymentService
                     'vat' => $session->bills()->sum('vat'),
                     'total' => $session->bills()->sum('total'),
                 ]);
+                RestaurantTable::query()->whereKey($session->table_id)->update(['is_enabled' => false]);
                 Order::query()->where('table_session_id', $session->id)->where('status', '!=', 'cancelled')->update([
                     'payment_status' => 'paid', 'payment_method' => $method,
                     'paid_at' => $paidAt, 'cashier_id' => $cashier->id,

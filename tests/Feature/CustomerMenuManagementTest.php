@@ -11,9 +11,12 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\AddsOrderRecipe;
 
 class CustomerMenuManagementTest extends TestCase
 {
+    use AddsOrderRecipe;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,7 +38,8 @@ class CustomerMenuManagementTest extends TestCase
 
     public function test_public_menu_only_shows_active_available_items(): void
     {
-        $this->createMenuItem('Visible dish', true, true);
+        $visible = $this->createMenuItem('Visible dish', true, true);
+        $this->addOrderRecipe($visible, 'Visible menu stock');
         $this->createMenuItem('Unavailable dish', true, false);
         $this->createMenuItem('Inactive dish', false, true);
 

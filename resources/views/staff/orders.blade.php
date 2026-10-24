@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">@include('partials.favicon')<title>Kitchen Order Board</title>@include('partials.theme-init')@vite(['resources/css/app.css','resources/css/app-theme.css','resources/js/app.js','resources/js/app-theme.js'])</head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
-<header class="bg-red-800 text-white"><div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-5"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-red-100">Passenger Seat · Staff</p><h1 class="text-2xl font-black">Order board</h1></div><nav class="flex items-center gap-4"><x-theme-toggle class="rounded-lg border border-white/50 px-3 py-2 text-sm font-bold text-white" /><a class="font-bold underline" href="{{ route('menu.index') }}">Public menu</a></nav></div></header>
+<header class="bg-red-800 text-white"><div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-5"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-red-100">Passenger Seat · Staff</p><h1 class="text-2xl font-black">Order board</h1></div><nav class="flex items-center gap-4"><x-theme-toggle class="rounded-lg border border-white/50 px-3 py-2 text-sm font-bold text-white" /><a class="font-bold underline" href="{{ route('menu') }}">Public menu</a></nav></div></header>
 <main class="mx-auto max-w-7xl px-4 py-8">
 @if (session('success'))<div class="mb-5 rounded-xl bg-emerald-50 p-3 font-semibold text-emerald-800">{{ session('success') }}</div>@endif
 <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -14,7 +14,7 @@
 <p class="mt-4 text-lg font-black">₱{{ number_format((float) $order->total_amount, 2) }}</p>
 <div class="mt-4 flex flex-wrap gap-2">
 @if ($order->status === 'pending')<form method="POST" action="{{ route('staff.orders.status', $order) }}">@csrf @method('PATCH')<input type="hidden" name="status" value="preparing"><button class="rounded-lg bg-red-700 px-3 py-2 text-sm font-bold text-white">Start preparing</button></form>@endif
-@if ($order->status === 'preparing')<form method="POST" action="{{ route('staff.orders.status', $order) }}">@csrf @method('PATCH')<input type="hidden" name="status" value="completed"><button class="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Mark completed</button></form>@endif
+@if ($order->status === 'ready')<form method="POST" action="{{ route('staff.orders.complete', $order) }}">@csrf @method('PATCH')<button class="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Mark Served</button></form>@endif
 @if (in_array($order->status, ['pending','preparing'], true))<form method="POST" action="{{ route('staff.orders.status', $order) }}">@csrf @method('PATCH')<input type="hidden" name="status" value="cancelled"><button class="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-700">Cancel</button></form>@endif
 </div></article>
 @empty<div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center"><h2 class="text-xl font-black">No active orders</h2><p class="mt-2 text-slate-500">New customer orders will appear here.</p></div>@endforelse

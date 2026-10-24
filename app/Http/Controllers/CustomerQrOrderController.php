@@ -106,7 +106,16 @@ class CustomerQrOrderController extends Controller
             ]);
         }
 
-        $menuItems = $this->customerOrderableMenuItems();
+        $tableOpen = TableSession::query()
+            ->where('table_id', $table->id)
+            ->whereIn('status', ['open', 'bill_requested'])
+            ->whereNull('closed_at')
+            ->exists();
+
+        // Keep sold-out dishes visible so guests can see the menu. The live
+        // session endpoint and order submission still expose/accept only dishes
+        // with a configured, sufficiently stocked recipe.
+        $menuItems = $this->customerQrMenuItems();
 
         $items = CustomerMenuItemResource::collection($menuItems)->resolve();
         $menu = collect($items)
@@ -129,6 +138,7 @@ class CustomerQrOrderController extends Controller
 
         return view('customer.table-order', [
             'invalidTable' => false,
+            'tableOpen' => $tableOpen,
             'tableNumber' => $table->table_number,
             'tableToken' => $table->qr_token,
             'orderUrl' => route('customer.order.submit', ['tableToken' => $table->qr_token], false),
@@ -156,6 +166,7 @@ class CustomerQrOrderController extends Controller
 
         $tableSession = TableSession::query()
             ->where('table_id', $table->id)
+            ->where('table_number', $table->table_number)
             ->whereIn('status', ['open', 'bill_requested'])
             ->whereNull('closed_at')
             ->latest('opened_at')
@@ -164,7 +175,7 @@ class CustomerQrOrderController extends Controller
         return response()->json([
             'session' => $tableSession === null ? null : $bill->refresh($tableSession),
             'available_item_ids' => $this->customerOrderableMenuItems()->modelKeys(),
-        ]);
+        ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate');
     }
 
     public function status(Request $request, string $tableToken): JsonResponse
@@ -360,6 +371,11 @@ class CustomerQrOrderController extends Controller
     public function orders(TableSession $tableSession): JsonResponse
     {
         $orders = $tableSession->orders()
+            ->when($tableSession->table_id !== null, fn ($query) => $query
+                ->where(fn ($orders) => $orders->whereNull('source')->orWhere('source', '!=', 'table_qr'))
+                ->orWhere(fn ($orders) => $orders
+                    ->where('table_session_id', $tableSession->id)
+                    ->where('table_id', $tableSession->table_id)))
             ->with('items')
             ->latest()
             ->get()
@@ -536,6 +552,13 @@ class CustomerQrOrderController extends Controller
 
     private function customerOrderableMenuItems(): EloquentCollection
     {
+        return $this->customerQrMenuItems()
+            ->filter(fn (MenuItem $item): bool => $item->isOrderable())
+            ->values();
+    }
+
+    private function customerQrMenuItems(): EloquentCollection
+    {
         return MenuItem::query()
             ->with([
                 'category:id,name',
@@ -553,8 +576,8 @@ class CustomerQrOrderController extends Controller
             ->orderBy('menu_category_id')
             ->orderBy('id')
             ->get()
-            ->filter(fn (MenuItem $item): bool => $item->isOrderable()
-                && ($item->variants->isEmpty() || $item->variants->contains('is_active', true))
+            ->filter(fn (MenuItem $item): bool =>
+                ($item->variants->isEmpty() || $item->variants->contains('is_active', true))
                 && $item->modifierGroups->every(
                     fn ($group): bool => ! $group->is_required
                         || $group->options->contains('is_active', true),

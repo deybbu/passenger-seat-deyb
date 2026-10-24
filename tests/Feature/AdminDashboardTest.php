@@ -134,7 +134,7 @@ class AdminDashboardTest extends TestCase
                 ->assertOk()
                 ->assertJsonFragment(['no' => $reference, 'st' => 'Pending']);
 
-            foreach (['preparing', 'ready', 'completed'] as $status) {
+            foreach (['preparing', 'ready', 'served'] as $status) {
                 $order = \App\Models\Order::query()->where('reference_number', $reference)->firstOrFail();
                 $this->actingAs($admin)
                     ->patch(route('admin.orders.status', $order), ['status' => $status])
@@ -145,7 +145,7 @@ class AdminDashboardTest extends TestCase
             $this->actingAs($admin)
                 ->getJson(route('admin.api.reference.dashboard'))
                 ->assertOk()
-                ->assertJsonFragment(['no' => $reference, 'st' => 'Completed']);
+                ->assertJsonFragment(['no' => $reference, 'st' => 'Served']);
         } finally {
             DB::rollBack();
         }

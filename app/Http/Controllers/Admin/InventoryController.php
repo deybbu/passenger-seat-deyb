@@ -12,6 +12,7 @@ use App\Models\InventoryStockLot;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Services\InventoryService;
+use App\Support\InventoryTaxonomy;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,25 +27,13 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
 {
-    private const WASTE_STAGES = [
-        'Pre-consumer spoilage',
-        'Prep / production',
-        'Post-consumer plate',
-    ];
-
-    private const WASTE_REASONS = [
-        'Expired',
-        'Dropped/Spilled',
-        'Burned/Overcooked',
-        'Customer complaint',
-        'Incorrect prep',
-    ];
-
     public function index(): View
     {
         $ingredients = Ingredient::query()
+            ->usedByCurrentMenu()
             ->with(['stockLots' => fn ($query) => $query
                 ->where('remaining_quantity', '>', 0)
+                ->orderBy('received_at')
                 ->orderByRaw('CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END')
                 ->orderBy('expires_at')
                 ->orderBy('id')])
@@ -52,7 +41,7 @@ class InventoryController extends Controller
             ->get();
         $consumption = InventoryLog::query()
             ->selectRaw('ingredient_id, SUM(ABS(quantity)) as used_quantity')
-            ->whereIn('type', ['stock_out', 'prep_out'])
+            ->whereIn('type', ['stock_out', 'prep_out', 'waste'])
             ->where('created_at', '>=', today()->subDays(29)->startOfDay())
             ->groupBy('ingredient_id')
             ->pluck('used_quantity', 'ingredient_id');
@@ -97,6 +86,7 @@ class InventoryController extends Controller
         $batches = InventoryStockLot::query()
             ->with('ingredient')
             ->where('remaining_quantity', '>', 0)
+            ->orderBy('received_at')
             ->orderByRaw('CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END')
             ->orderBy('expires_at')
             ->orderBy('id')
@@ -178,9 +168,8 @@ class InventoryController extends Controller
             $purchaseOrder = PurchaseOrder::query()->create([
                 'reference' => $reference,
                 'supplier_name' => trim($validated['supplier_name']),
-                'status' => 'open',
+                'status' => 'draft',
                 'created_by' => $request->user()->id,
-                'ordered_at' => now(),
             ]);
             $purchaseOrder->items()->create([
                 'ingredient_id' => $lockedIngredient->id,
@@ -200,7 +189,7 @@ class InventoryController extends Controller
         });
 
         return redirect()->route('admin.purchase-orders')
-            ->with('status', "{$purchaseOrder->reference} created for {$ingredient->name}.");
+            ->with('status', "{$purchaseOrder->reference} draft created for {$ingredient->name}; manager approval is required.");
     }
 
     public function referencePurchaseOrder(Request $request, Ingredient $ingredient): JsonResponse
@@ -218,9 +207,8 @@ class InventoryController extends Controller
             $order = PurchaseOrder::query()->create([
                 'reference' => 'PO-'.Str::ulid(),
                 'supplier_name' => trim($validated['supplier_name']),
-                'status' => 'open',
+                'status' => 'draft',
                 'created_by' => $request->user()->id,
-                'ordered_at' => now(),
             ]);
             $order->items()->create([
                 'ingredient_id' => $lockedIngredient->id,
@@ -231,7 +219,7 @@ class InventoryController extends Controller
             return $order;
         });
 
-        return response()->json(['id' => $purchaseOrder->id, 'reference' => $purchaseOrder->reference]);
+        return response()->json(['id' => $purchaseOrder->id, 'reference' => $purchaseOrder->reference, 'status' => $purchaseOrder->status]);
     }
 
     public function referenceCloseShort(Request $request, PurchaseOrderItem $purchaseOrderItem): JsonResponse
@@ -253,19 +241,35 @@ class InventoryController extends Controller
         return response()->json(['message' => $message]);
     }
 
+    public function referenceApprovePurchaseOrder(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
+    {
+        if ($purchaseOrder->status !== 'draft' || $purchaseOrder->items()->doesntExist()) {
+            return response()->json(['message' => 'Only a non-empty draft purchase order can be approved.'], 409);
+        }
+        $purchaseOrder->update([
+            'status' => 'open', 'approved_by' => $request->user()->id,
+            'approved_at' => now(), 'ordered_at' => now(),
+        ]);
+        return response()->json(['message' => 'Purchase order approved and open for receiving.']);
+    }
+
     public function referenceWaste(Request $request, InventoryService $inventory): JsonResponse
     {
         $validated = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
             'quantity' => ['required', 'numeric', 'gt:0'],
-            'stage' => ['required', Rule::in(self::WASTE_STAGES)],
-            'reason' => ['required', Rule::in(self::WASTE_REASONS)],
+            'stage' => ['required', Rule::in(InventoryTaxonomy::wasteStages())],
+            'reason' => ['required', Rule::in(InventoryTaxonomy::wasteReasons())],
+            'other_reason' => ['nullable', 'string', 'max:80', Rule::requiredIf(fn (): bool => $request->input('reason') === InventoryTaxonomy::OTHER_REASON)],
         ]);
+        $reason = $validated['reason'] === InventoryTaxonomy::OTHER_REASON
+            ? 'Others: '.trim((string) $validated['other_reason'])
+            : $validated['reason'];
         $cost = $inventory->recordWaste(
             Ingredient::findOrFail($validated['ingredient_id']),
             (float) $validated['quantity'],
-            $validated['reason'],
-            $validated['reason'],
+            $reason,
+            $reason,
             $request->user(),
             $validated['stage'],
         );
@@ -480,8 +484,8 @@ class InventoryController extends Controller
             ->whereDate('expires_at', '<=', today()->addDays(5))
             ->orderBy('expires_at')
             ->get();
-        $wasteStages = self::WASTE_STAGES;
-        $wasteReasons = self::WASTE_REASONS;
+        $wasteStages = InventoryTaxonomy::wasteStages();
+        $wasteReasons = InventoryTaxonomy::wasteReasons();
 
         return view('admin.waste', compact('ingredients', 'logs', 'lossByStage', 'nearExpiry', 'wasteStages', 'wasteReasons'));
     }
@@ -491,16 +495,20 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
             'quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
-            'stage' => ['required', Rule::in(self::WASTE_STAGES)],
-            'reason' => ['required', Rule::in(self::WASTE_REASONS)],
+            'stage' => ['required', Rule::in(InventoryTaxonomy::wasteStages())],
+            'reason' => ['required', Rule::in(InventoryTaxonomy::wasteReasons())],
+            'other_reason' => ['nullable', 'string', 'max:80', Rule::requiredIf(fn (): bool => $request->input('reason') === InventoryTaxonomy::OTHER_REASON)],
         ]);
 
         try {
+            $reason = $validated['reason'] === InventoryTaxonomy::OTHER_REASON
+                ? 'Others: '.trim((string) $validated['other_reason'])
+                : $validated['reason'];
             $inventory->recordWaste(
                 Ingredient::query()->findOrFail($validated['ingredient_id']),
                 (float) $validated['quantity'],
-                $validated['reason'],
-                $validated['reason'],
+                $reason,
+                $reason,
                 $request->user(),
                 $validated['stage'],
             );

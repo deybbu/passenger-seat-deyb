@@ -24,7 +24,7 @@ class OrderController extends Controller
         $query = Order::query()->notHeld()->with('items')->latest();
 
         if ($filter !== 'all') {
-            if (in_array($filter, ['pending', 'preparing', 'ready', 'completed', 'cancelled'], true)) {
+            if (in_array($filter, ['pending', 'preparing', 'ready', 'served', 'cancelled'], true)) {
                 $query->where('status', $filter);
             } else {
                 $filter = 'all';
@@ -61,7 +61,7 @@ class OrderController extends Controller
             'pending' => Order::query()->notHeld()->where('status', 'pending')->count(),
             'preparing' => Order::query()->notHeld()->where('status', 'preparing')->count(),
             'ready' => Order::query()->notHeld()->where('status', 'ready')->count(),
-            'completed' => Order::query()->notHeld()->where('status', 'completed')->count(),
+            'served' => Order::query()->notHeld()->where('status', 'served')->count(),
             'cancelled' => Order::query()->notHeld()->where('status', 'cancelled')->count(),
         ];
 
@@ -71,7 +71,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order, OrderService $orders): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['preparing', 'ready', 'completed', 'cancelled'])],
+            'status' => ['required', Rule::in(['preparing', 'ready', 'served', 'cancelled'])],
         ]);
 
         try {
@@ -86,7 +86,7 @@ class OrderController extends Controller
     public function referenceStatus(Request $request, Order $order, OrderService $orders): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['preparing', 'ready', 'completed', 'cancelled'])],
+            'status' => ['required', Rule::in(['preparing', 'ready', 'served', 'cancelled'])],
         ]);
         try {
             $orders->transition($order, $validated['status'], $request->user());

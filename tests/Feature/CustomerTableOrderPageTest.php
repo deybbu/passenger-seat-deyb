@@ -20,10 +20,15 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\AddsOrderRecipe;
 
 class CustomerTableOrderPageTest extends TestCase
 {
+    use AddsOrderRecipe;
+
     private MenuItem $menuItem;
+
+    private Ingredient $defaultIngredient;
 
     protected function setUp(): void
     {
@@ -58,6 +63,7 @@ class CustomerTableOrderPageTest extends TestCase
             'is_active' => true,
             'is_available' => true,
         ]);
+        $this->defaultIngredient = $this->addOrderRecipe($this->menuItem, 'Default QR stock');
     }
 
     public function test_valid_table_token_shows_table_and_database_menu_without_login(): void
@@ -391,6 +397,7 @@ class CustomerTableOrderPageTest extends TestCase
 
     public function test_table_qr_orders_reserve_and_consume_variant_recipe_stock_fifo(): void
     {
+        $this->menuItem->ingredients()->detach($this->defaultIngredient->id);
         $table = $this->createEnabledTable();
         $ingredient = Ingredient::query()->create([
             'name' => 'Rice',
@@ -434,7 +441,7 @@ class CustomerTableOrderPageTest extends TestCase
         $order = Order::query()->where('reference_number', $response->json('reference'))->firstOrFail();
 
         $this->assertSame(3.0, (float) $order->ingredientReservations()->sum('quantity'));
-        $this->assertSame(4.0, (float) $ingredient->fresh()->current_stock);
+        $this->assertSame(1.0, (float) $ingredient->fresh()->current_stock);
         $this->getJson(route('customer.order.session', ['tableToken' => $table->qr_token]))
             ->assertOk()
             ->assertJsonPath('available_item_ids', []);

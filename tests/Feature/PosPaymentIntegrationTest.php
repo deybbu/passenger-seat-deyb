@@ -18,9 +18,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\AddsOrderRecipe;
 
 class PosPaymentIntegrationTest extends TestCase
 {
+    use AddsOrderRecipe;
+
     private User $cashier;
 
     private User $secondCashier;
@@ -66,6 +69,7 @@ class PosPaymentIntegrationTest extends TestCase
             'is_active' => true,
             'is_available' => true,
         ]);
+        $this->addOrderRecipe($this->menuItem, 'POS stock');
     }
 
     public function test_register_rejects_identification_discount_without_cardholder_id(): void

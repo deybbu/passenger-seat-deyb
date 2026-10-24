@@ -43,7 +43,7 @@ final class OrderService
 
         return DB::transaction(function () use ($data, $lines, $staff) {
             $isTableQr = ($data['source'] ?? null) === 'table_qr';
-            $isCustomerOrder = $isTableQr || ($data['source'] ?? null) === 'cashier';
+            $isCustomerOrder = $isTableQr || in_array($data['source'] ?? null, ['cashier', 'website'], true);
             $table = null;
             $tableSession = null;
             $batchNumber = null;
@@ -71,6 +71,12 @@ final class OrderService
                 if ($tableSession?->status === 'bill_requested' || $tableSession?->bill_requested_at !== null) {
                     throw new \DomainException(
                         'A bill has already been requested for this table. Cancel the request before ordering again.',
+                    );
+                }
+
+                if ($tableSession === null) {
+                    throw new \DomainException(
+                        "Table {$table->table_number} isn't open yet. Please ask staff to start a new table session.",
                     );
                 }
             }
@@ -183,17 +189,6 @@ final class OrderService
                 }
             }
 
-            if ($isTableQr && $tableSession === null) {
-                $tableSession = TableSession::query()->create([
-                    'table_number' => $table->table_number,
-                    'table_id' => $table->id,
-                    'public_token' => \Illuminate\Support\Str::random(64),
-                    'active_table_number' => $table->table_number,
-                    'status' => 'open',
-                    'opened_at' => now(),
-                ]);
-            }
-
             if ($tableSession !== null) {
                 $batchNumber = (int) $tableSession->orders()->max('batch_number') + 1;
             }
@@ -283,6 +278,7 @@ final class OrderService
             }
 
             $this->inventory->reserveForOrder($order, $lockedLines);
+            $this->inventory->consumeReservationsForOrder($order, $staff);
 
             if ($isTableQr) {
                 ActivityLog::query()->create([
@@ -304,7 +300,9 @@ final class OrderService
             if (($data['source'] ?? null) === 'cashier') {
                 ActivityLog::query()->create([
                     'user_id' => $staff?->id,
-                    'action' => 'Cashier pay-later order placed',
+                    'action' => ($data['handling'] ?? null) === 'pay_now'
+                        ? 'Cashier pay-now order placed'
+                        : 'Cashier pay-later order placed',
                     'module' => 'orders',
                     'subject_type' => Order::class,
                     'subject_id' => $order->id,
@@ -345,7 +343,11 @@ final class OrderService
                     throw new \DomainException('This order is already paid. Handle the refund first.');
                 }
 
-                $this->inventory->releaseOrRestoreForCancelledOrder($locked, $actor);
+                $this->inventory->releaseOrRestoreForCancelledOrder(
+                    $locked,
+                    $actor,
+                    restoreConsumed: $locked->status === 'pending',
+                );
             }
 
             if ($to === 'preparing') {
@@ -360,6 +362,22 @@ final class OrderService
                 'to_status' => $to,
                 'changed_by' => $actor->id,
             ]);
+
+            if ($to === 'cancelled') {
+                ActivityLog::query()->create([
+                    'user_id' => $actor->id,
+                    'action' => $from === 'pending'
+                        ? 'Order cancelled; stock restored'
+                        : 'Order cancelled; stock recorded as waste',
+                    'module' => 'inventory',
+                    'subject_type' => Order::class,
+                    'subject_id' => $locked->id,
+                    'metadata' => [
+                        'reference_number' => $locked->reference_number,
+                        'from_status' => $from,
+                    ],
+                ]);
+            }
 
             return $locked;
         });

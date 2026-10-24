@@ -18,7 +18,7 @@ class CartController extends Controller
 
     public function add(Request $request, MenuItem $menuItem): RedirectResponse
     {
-        abort_unless($menuItem->is_available, 422, 'This menu item is currently unavailable.');
+        abort_unless($menuItem->isOrderable(), 422, 'This menu item is currently unavailable.');
         $cart = $this->cart($request);
         $id = (string) $menuItem->id;
         $cart[$id] = min(99, (int) ($cart[$id] ?? 0) + 1);
@@ -36,7 +36,7 @@ class CartController extends Controller
         if ((int) $validated['quantity'] === 0) {
             unset($cart[$id]);
         } else {
-            abort_unless($menuItem->is_available, 422);
+            abort_unless($menuItem->isOrderable(), 422);
             $cart[$id] = (int) $validated['quantity'];
         }
 
@@ -62,7 +62,10 @@ class CartController extends Controller
         }
 
         $ids = array_values(array_filter(array_map('intval', array_keys($raw))));
-        $availableIds = MenuItem::query()->whereIn('id', $ids)->where('is_available', true)->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $availableIds = MenuItem::query()->withStockAvailability()->whereIn('id', $ids)->get()
+            ->filter(fn (MenuItem $item): bool => $item->isOrderable())
+            ->modelKeys();
+        $availableIds = array_map('strval', $availableIds);
         $cart = [];
 
         foreach ($raw as $id => $quantity) {

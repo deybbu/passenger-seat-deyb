@@ -45,7 +45,7 @@
             <div class="admin-card-header"><span class="admin-card-title">Orders by status</span></div>
             <div class="admin-table-wrap"><table class="admin-data-table"><thead><tr><th>Status</th><th>Orders</th></tr></thead><tbody>
                 @forelse($byStatus as $status => $count)
-                    <tr><td><span class="badge-status badge-{{ in_array($status, ['completed'], true) ? 'in-stock' : ($status === 'cancelled' ? 'out-of-stock' : 'low-stock') }}">{{ ucfirst($status) }}</span></td><td>{{ $count }}</td></tr>
+                    <tr><td><span class="badge-status badge-{{ in_array($status, ['served'], true) ? 'in-stock' : ($status === 'cancelled' ? 'out-of-stock' : 'low-stock') }}">{{ ucfirst($status) }}</span></td><td>{{ $count }}</td></tr>
                 @empty
                     <tr><td colspan="2" class="admin-muted">No orders in this period.</td></tr>
                 @endforelse

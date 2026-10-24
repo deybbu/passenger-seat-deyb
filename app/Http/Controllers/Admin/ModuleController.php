@@ -28,6 +28,7 @@ use App\Models\UnansweredQuestion;
 use App\Models\User;
 use App\Services\InventoryService;
 use App\Support\AdminSettings;
+use App\Support\InventoryTaxonomy;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -363,7 +364,7 @@ class ModuleController extends Controller
 
     public function waste(): View
     {
-        $ingredients = Ingredient::query()->orderBy('name')->get();
+        $ingredients = Ingredient::query()->usedByCurrentMenu()->orderBy('name')->get();
         $logs = InventoryLog::query()
             ->with(['ingredient', 'user'])
             ->where('type', 'waste')
@@ -379,17 +380,23 @@ class ModuleController extends Controller
         $validated = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
             'quantity' => ['required', 'numeric', 'min:0.001', 'max:999999'],
-            'reason' => ['required', Rule::in(['Pre-Cook Spoilage', 'Over-Prep Waste', 'Boodle Return', 'Other'])],
+            'stage' => ['required', Rule::in(InventoryTaxonomy::wasteStages())],
+            'reason' => ['required', Rule::in(InventoryTaxonomy::wasteReasons())],
+            'other_reason' => ['nullable', 'string', 'max:80', Rule::requiredIf(fn (): bool => $request->input('reason') === InventoryTaxonomy::OTHER_REASON)],
             'notes' => ['required', 'string', 'max:500'],
         ]);
 
         try {
+            $reason = $validated['reason'] === InventoryTaxonomy::OTHER_REASON
+                ? 'Others: '.trim((string) $validated['other_reason'])
+                : $validated['reason'];
             $inventory->recordWaste(
                 Ingredient::findOrFail($validated['ingredient_id']),
                 (float) $validated['quantity'],
-                $validated['reason'],
-                trim($validated['notes']),
+                $reason,
+                $reason.' · '.trim($validated['notes']),
                 $request->user(),
+                $validated['stage'],
             );
         } catch (\DomainException $exception) {
             return back()->with('error', $exception->getMessage());
@@ -436,7 +443,11 @@ class ModuleController extends Controller
         $lines = OrderItem::query()->whereHas('order', fn ($query) => $query
             ->notHeld()->where('status', '!=', 'cancelled')
             ->whereBetween('created_at', [$start, $today->copy()->endOfDay()]))
-            ->with('menuItem.category')->get();
+            ->with('menuItem.category')->get()
+            ->filter(fn (OrderItem $line): bool => $line->menuItem !== null
+                && $line->menuItem->is_active
+                && $line->menuItem->archived_at === null)
+            ->values();
         $salesByCategory = $lines->groupBy(fn (OrderItem $line): string =>
             $line->menuItem?->category?->name ?? $line->category_name_snapshot ?? 'Uncategorized'
         )->map(fn (Collection $categoryLines): float =>
@@ -450,7 +461,7 @@ class ModuleController extends Controller
             ])->sortByDesc('units')->values()->take(10);
         $paymentMethods = (clone $orders)->selectRaw("COALESCE(payment_method, 'Unspecified') as method, SUM({$totalCol}) as total")
             ->groupBy('method')->orderByDesc('total')->get();
-        $allIngredients = Ingredient::query()->get();
+        $allIngredients = Ingredient::query()->usedByCurrentMenu()->get();
         $inventoryStatus = [
             'OK' => $allIngredients->filter(fn (Ingredient $ingredient): bool => ! $ingredient->isLowStock() && $ingredient->usableStock() > 0)->count(),
             'Low' => $allIngredients->filter(fn (Ingredient $ingredient): bool => $ingredient->isLowStock() && $ingredient->usableStock() > 0)->count(),
@@ -863,7 +874,7 @@ class ModuleController extends Controller
         $defaults = [
             ['title' => 'Opening hours', 'body' => 'Passenger Seat is open daily from the hours set in System settings. Kitchen last call is 30 minutes before close.'],
             ['title' => 'Low stock policy', 'body' => 'Ingredients at or below the minimum threshold appear in Inventory and the notifications panel. Receive stock from Barcode receiving or Inventory.'],
-            ['title' => 'Order flow', 'body' => 'Orders move Pending → Preparing → Ready → Completed. Admins can advance status from Order management.'],
+            ['title' => 'Order flow', 'body' => 'Orders move Pending → Preparing → Ready → Served. Admins can advance status from Order management.'],
             ['title' => 'Wi-Fi', 'body' => 'Guest Wi-Fi is posted at the counter. Staff accounts use the staff login page, not the public site.'],
         ];
 
@@ -891,7 +902,7 @@ class ModuleController extends Controller
             return 'Check Inventory management for live stock and low-stock alerts. You can receive packages from Barcode receiving.';
         }
         if (Str::contains($hay, ['order', 'kitchen'])) {
-            return 'Order management lists every ticket. Use the status tabs, then Mark Preparing, Ready, or Completed.';
+            return 'Order management lists every ticket. Use the status tabs, then Mark Preparing, Ready, or Served.';
         }
         if (Str::contains($hay, ['wifi', 'wi-fi'])) {
             return 'Guest Wi-Fi is posted at the counter. Staff should use their own login.';

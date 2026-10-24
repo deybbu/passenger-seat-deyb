@@ -36,5 +36,11 @@
                 {{ $availability }}
             </span>
         </div>
+        @if ($item->isOrderable())
+            <form method="POST" action="{{ route('cart.add', $item) }}" class="mt-4">
+                @csrf
+                <button type="submit" class="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800">Add to cart</button>
+            </form>
+        @endif
     </div>
 </article>

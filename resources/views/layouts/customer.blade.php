@@ -12,7 +12,7 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
     <header class="border-b border-red-100 bg-white">
         <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-            <a href="{{ route('menu.index') }}" class="flex items-center gap-3" aria-label="Passenger Seat home">
+            <a href="{{ route('menu') }}" class="flex items-center gap-3" aria-label="Passenger Seat home">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-red-700 text-lg font-black text-white">PS</span>
                 <span>
                     <span class="block text-lg font-black tracking-tight">PASSENGER SEAT</span>
@@ -20,7 +20,7 @@
                 </span>
             </a>
             <nav class="flex items-center gap-3">
-                <a href="{{ route('menu.index') }}" class="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-800 sm:inline">Menu</a>
+                <a href="{{ route('menu') }}" class="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-800 sm:inline">Menu</a>
                 <a href="{{ route('cart.show') }}" class="rounded-lg bg-red-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
                     Cart <span class="ml-1 rounded-full bg-white/20 px-2 py-0.5">{{ collect(session('cart', []))->sum() }}</span>
                 </a>
@@ -54,5 +54,6 @@
             <p>Good food. Smooth journey. Please proceed to the counter for payment.</p>
         </div>
     </footer>
+    @stack('scripts')
 </body>
 </html>

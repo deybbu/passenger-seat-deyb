@@ -22,7 +22,7 @@
             <label for="status" class="mb-1 block text-xs font-semibold text-gray-600">Order status</label>
             <select id="status" name="status" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 <option value="">All</option>
-                @foreach (['pending', 'preparing', 'completed', 'cancelled'] as $s)
+                @foreach (['pending', 'preparing', 'ready', 'served', 'cancelled'] as $s)
                     <option value="{{ $s }}" @selected(request('status') === $s)>{{ ucfirst($s) }}</option>
                 @endforeach
             </select>

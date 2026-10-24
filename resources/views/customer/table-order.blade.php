@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+@include('partials.favicon')
 <title>Passenger Seat – Order</title>
 <meta name="theme-color" content="#C62828">
 <script>
@@ -24,6 +25,14 @@ var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL
     <p style="color:var(--red);font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Passenger Seat</p>
     <h1 style="margin-top:14px;font-family:var(--disp);font-size:42px;font-weight:400;line-height:1.05">This QR code isn't valid</h1>
     <p style="margin-top:14px;color:var(--mute);font-size:15px;line-height:1.5">Please ask our staff for a valid table QR code.</p>
+  </div>
+</main>
+@elseif (! $tableOpen)
+<main class="stage" style="justify-content:center;text-align:center">
+  <div style="max-width:440px;margin:auto">
+    <p style="color:var(--red);font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Passenger Seat</p>
+    <h1 style="margin-top:14px;font-family:var(--disp);font-size:42px;font-weight:400;line-height:1.05">Table {{ $tableNumber }} isn't open yet</h1>
+    <p style="margin-top:14px;color:var(--mute);font-size:15px;line-height:1.5">Please ask our staff to open a new table session, then scan the code again.</p>
   </div>
 </main>
 @else
@@ -59,6 +68,7 @@ window.PS_MENU_ITEMS = @js($items);
 window.PS_DETAILS = @js($details);
 window.PS_PHOTOS = @js($photos);
 window.PS_TABLE_NUMBER = @js((string) $tableNumber);
+window.PS_TABLE_TOKEN = @js((string) $tableToken);
 window.PS_ORDER_ENDPOINT = @js($orderUrl);
 window.PS_SESSION_ENDPOINT = @js($sessionUrl);
 window.PS_BILL_ENDPOINT = @js($billRequestUrl);

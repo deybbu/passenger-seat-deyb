@@ -126,7 +126,7 @@ class OrderReservationWorkflowTest extends TestCase
         $this->assertStringStartsWith('PSR-', $placed->json('reference'));
 
         $this->assertDatabaseCount('orders', 1);
-        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertSame(7.0, (float) $this->ingredient->fresh()->current_stock);
 
         $this->postJson(route('customer.qr.place'), $payload)
             ->assertOk()
@@ -197,12 +197,13 @@ class OrderReservationWorkflowTest extends TestCase
         $this->actingAs($kitchen)
             ->get(route('staff.kitchen.index'))
             ->assertOk()
-            ->assertSee($order->reference_number)
-            ->assertSee('Test meal')
-            ->assertSee('No onions')
-            ->assertSee('Ingredient stock')
-            ->assertSee('3.000 kg reserved')
-            ->assertDontSee('PS-0107');
+            ->assertSee('data-orders-url=', false)
+            ->assertSee('data-inventory-url=', false);
+
+        $this->getJson(route('staff.kitchen.orders.data'))
+            ->assertOk()
+            ->assertJsonPath('orders.0.id', $order->reference_number)
+            ->assertJsonPath('orders.0.sp', 'No onions');
 
         $this->get(route('staff.kitchen.board'))
             ->assertOk()
@@ -542,13 +543,14 @@ class OrderReservationWorkflowTest extends TestCase
             ->assertSee('Analytics &amp; Reports', false);
     }
 
-    public function test_orders_reserve_stock_and_only_deduct_when_preparation_starts(): void
+    public function test_orders_deduct_stock_once_when_placed_and_reject_insufficient_stock(): void
     {
         $order = $this->placeOrder(2);
 
-        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertSame(7.0, (float) $this->ingredient->fresh()->current_stock);
         $this->assertSame(3.0, (float) $order->ingredientReservations()->sum('quantity'));
-        $this->assertSame('reserved', $order->ingredientReservations()->value('status'));
+        $this->assertSame('consumed', $order->ingredientReservations()->value('status'));
+        $this->assertSame(1, DB::table('inventory_logs')->where('order_id', $order->id)->where('type', 'stock_out')->count());
 
         try {
             $this->placeOrder(5);
@@ -711,8 +713,11 @@ class OrderReservationWorkflowTest extends TestCase
         $this->actingAs($kitchen)
             ->get(route('staff.kitchen.index'))
             ->assertOk()
-            ->assertSee('Raw needed per serving (with yield loss): 2 kg Rice')
-            ->assertSee('Low stock');
+            ->assertSee('data-inventory-url=', false);
+        $inventory = $this->getJson(route('staff.kitchen.inventory.data'))->assertOk();
+        $this->assertSame(2.0, (float) $inventory->json('recipes.0.1.0.1'));
+        $this->assertSame('Rice', $inventory->json('ingredients.0.n'));
+        $this->assertSame(6.0, (float) $inventory->json('ingredients.0.s'));
     }
 
     public function test_manual_stock_out_cannot_consume_reserved_ingredients(): void
@@ -732,10 +737,12 @@ class OrderReservationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('quantity');
 
-        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
-        $this->assertDatabaseMissing('inventory_logs', [
+        $this->assertSame(1.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertDatabaseHas('inventory_logs', [
             'ingredient_id' => $this->ingredient->id,
             'type' => 'stock_out',
+            'quantity' => 9,
+            'order_id' => $order->id,
         ]);
 
         $admin = User::create([
@@ -1433,7 +1440,7 @@ class OrderReservationWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_cancelling_orders_releases_or_restores_their_stock_correctly(): void
+    public function test_cancelling_before_preparation_restores_stock_and_after_start_records_waste(): void
     {
         $pendingOrder = $this->placeOrder(4);
 
@@ -1447,24 +1454,24 @@ class OrderReservationWorkflowTest extends TestCase
             );
             $this->fail('A manual stock movement consumed stock reserved by a pending order.');
         } catch (\DomainException $exception) {
-            $this->assertStringContainsString('reserved', $exception->getMessage());
+            $this->assertStringContainsString('stock', strtolower($exception->getMessage()));
         }
 
         $this->orders->transition($pendingOrder, 'cancelled', $this->cashier);
 
-        $this->assertSame('released', $pendingOrder->ingredientReservations()->value('status'));
+        $this->assertSame('restored', $pendingOrder->ingredientReservations()->value('status'));
         $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
 
         $preparingOrder = $this->placeOrder(2);
         $this->orders->transition($preparingOrder, 'preparing', $this->cashier);
         $this->orders->transition($preparingOrder, 'cancelled', $this->cashier);
 
-        $this->assertSame('restored', $preparingOrder->ingredientReservations()->value('status'));
-        $this->assertSame(10.0, (float) $this->ingredient->fresh()->current_stock);
+        $this->assertSame('wasted', $preparingOrder->ingredientReservations()->value('status'));
+        $this->assertSame(7.0, (float) $this->ingredient->fresh()->current_stock);
         $this->assertDatabaseHas('inventory_logs', [
             'order_id' => $preparingOrder->id,
-            'type' => 'adjustment',
-            'quantity' => 3,
+            'type' => 'waste',
+            'quantity' => -3,
         ]);
     }
 
@@ -1473,15 +1480,15 @@ class OrderReservationWorkflowTest extends TestCase
         $order = $this->placeOrder(1);
         $this->orders->transition($order, 'preparing', $this->cashier);
         $this->orders->transition($order, 'ready', $this->cashier);
-        $this->orders->transition($order, 'completed', $this->cashier);
+        $this->orders->transition($order, 'served', $this->cashier);
 
-        $this->assertSame('completed', $order->fresh()->status);
+        $this->assertSame('served', $order->fresh()->status);
         $this->assertSame(
-            ['pending', 'preparing', 'ready', 'completed'],
+            ['pending', 'preparing', 'ready', 'served'],
             $order->statusHistories()->pluck('to_status')->all(),
         );
 
-        $this->assertFalse($order->fresh()->canTransitionTo('completed'));
+        $this->assertFalse($order->fresh()->canTransitionTo('served'));
     }
 
     private function placeOrder(int $quantity): Order
@@ -1505,7 +1512,7 @@ class OrderReservationWorkflowTest extends TestCase
     {
         $this->orders->transition($order, 'preparing', $this->cashier);
         $this->orders->transition($order, 'ready', $this->cashier);
-        $this->orders->transition($order, 'completed', $this->cashier);
+        $this->orders->transition($order, 'served', $this->cashier);
     }
 
     private function createSchema(): void

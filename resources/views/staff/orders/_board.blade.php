@@ -5,7 +5,7 @@
         ['Pending', $pending, 'bg-amber-500'],
         ['Preparing', $preparing, 'bg-sky-500'],
         ['Ready', $ready, 'bg-indigo-500'],
-        ['Completed today', $completed, 'bg-emerald-500'],
+        ['Served today', $served, 'bg-emerald-500'],
     ] as [$label, $orders, $dot])
         <section aria-label="{{ $label }} orders">
             <h2 class="mb-3 flex items-center gap-2 font-display text-2xl font-bold uppercase">

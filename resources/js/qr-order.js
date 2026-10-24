@@ -155,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
         && order.status !== 'cancelled');
 
     const renderOrders = () => {
-        const statusSteps = ['pending', 'preparing', 'ready', 'completed'];
+        const statusSteps = ['pending', 'preparing', 'ready', 'served'];
         const statuses = {
             pending: 'Received',
             preparing: 'Preparing',
             ready: 'Ready',
-            completed: 'Served',
+            served: 'Served',
         };
         const orderCards = orders.length ? orders.map((order) => {
             const currentStep = statusSteps.indexOf(order.status);

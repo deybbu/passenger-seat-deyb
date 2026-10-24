@@ -19,6 +19,7 @@ class OrderItem extends Model
         'variant_name_snapshot',
         'category_name_snapshot',
         'modifier_snapshot',
+        'notes',
         'quantity',
         'seat_number',
         'price',

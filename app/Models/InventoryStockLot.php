@@ -19,9 +19,14 @@ class InventoryStockLot extends Model
         'remaining_quantity',
         'unit_cost',
         'receipt_token',
+        'receipt_id',
         'received_by',
         'received_at',
+        'scanned_at',
         'storage_zone',
+        'storage_bin',
+        'manufacturer',
+        'serial_number',
         'purchase_order_item_id',
         'supplier_invoice_number',
     ];
@@ -33,6 +38,7 @@ class InventoryStockLot extends Model
             'received_quantity' => 'decimal:3',
             'remaining_quantity' => 'decimal:3',
             'unit_cost' => 'decimal:4',
+            'scanned_at' => 'datetime',
             'received_at' => 'datetime',
         ];
     }
@@ -50,6 +56,11 @@ class InventoryStockLot extends Model
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function receipt(): BelongsTo
+    {
+        return $this->belongsTo(InventoryReceipt::class, 'receipt_id');
     }
 
     public function logs(): HasMany

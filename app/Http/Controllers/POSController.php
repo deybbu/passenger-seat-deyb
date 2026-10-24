@@ -74,6 +74,11 @@ class POSController extends Controller
         $sessions = TableSession::query()
             ->whereIn('status', ['open', 'bill_requested'])
             ->whereNull('closed_at')
+            ->where(function (Builder $query): void {
+                $query->whereHas('restaurantTable', fn (Builder $table) => $table->where('is_enabled', true))
+                    ->orWhereHas('orders', fn (Builder $orders) => $orders->where('status', '!=', 'cancelled')->whereNull('held_at'))
+                    ->orWhere('status', 'bill_requested');
+            })
             ->with($sessionLoads)
             ->get()
             ->sortBy('table_number', SORT_NATURAL | SORT_FLAG_CASE)
@@ -122,7 +127,7 @@ class POSController extends Controller
         }
         $data = $request->validate([
             'type' => ['required', Rule::in(['dine_in', 'take_out'])],
-            'handling' => ['required', Rule::in(['pay_now', 'pay_later'])],
+            'handling' => ['sometimes', Rule::in(['pay_now', 'pay_later'])],
             'table_number' => $tableRules,
             'customer_name' => ['nullable', 'string', 'max:60'],
             'special_instructions' => ['nullable', 'string', 'max:1000'],
@@ -132,6 +137,8 @@ class POSController extends Controller
             ...($handling === 'pay_now' ? $this->paymentRules() : []),
             'idempotency_key' => ['required', 'uuid'],
         ]);
+        $data['handling'] = $handling;
+        $data['source'] = 'cashier';
 
         if ($data['handling'] === 'pay_later') {
             if ($data['type'] === 'take_out') {
@@ -881,7 +888,7 @@ class POSController extends Controller
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
-            'status' => ['nullable', Rule::in(['pending', 'preparing', 'ready', 'completed', 'cancelled'])],
+            'status' => ['nullable', Rule::in(['pending', 'preparing', 'ready', 'served', 'cancelled'])],
             'q' => ['nullable', 'string', 'max:80'],
         ]);
 

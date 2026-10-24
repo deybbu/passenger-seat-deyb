@@ -111,7 +111,33 @@ class TableSessionController extends Controller
                 ->with('error', 'Customer QR menus are globally disabled in System Settings.');
         }
 
-        $table = $qr->toggle($restaurantTable, $request->user());
+        $table = DB::transaction(function () use ($qr, $restaurantTable, $request): RestaurantTable {
+            $table = $qr->toggle($restaurantTable, $request->user());
+
+            if ($table->is_enabled) {
+                $hasOpenSession = TableSession::query()
+                    ->whereNull('closed_at')
+                    ->where(function ($query) use ($table): void {
+                        $query->where('table_id', $table->id)
+                            ->orWhere('active_table_number', $table->table_number);
+                    })
+                    ->exists();
+
+                if (! $hasOpenSession) {
+                    TableSession::query()->create([
+                        'table_number' => $table->table_number,
+                        'table_id' => $table->id,
+                        'public_token' => Str::random(64),
+                        'active_table_number' => $table->table_number,
+                        'guest_count' => 1,
+                        'opened_by' => $request->user()->id,
+                        'opened_at' => now(),
+                    ]);
+                }
+            }
+
+            return $table;
+        });
 
         if ($request->expectsJson()) {
             return response()->json((new PosRestaurantTableResource($table))->resolve($request));
@@ -226,8 +252,36 @@ class TableSessionController extends Controller
                 'active_table_number' => null,
                 'closed_by' => $request->user()->id,
             ]);
+            RestaurantTable::query()->whereKey($session->table_id)->update(['is_enabled' => false]);
 
             return back()->with('status', "Table {$session->table_number} QR access is closed.");
         });
+    }
+
+    public function closeEmpty(Request $request, TableSession $tableSession): JsonResponse
+    {
+        abort_unless($request->user()->hasRole('cashier', 'manager', 'admin'), 403);
+
+        return DB::transaction(function () use ($request, $tableSession): JsonResponse {
+            $session = TableSession::query()->lockForUpdate()->findOrFail($tableSession->id);
+            abort_if($session->closed_at !== null, 409, 'This table session is already closed.');
+
+            $hasOrders = Order::query()
+                ->where('table_session_id', $session->id)
+                ->where('status', '!=', 'cancelled')
+                ->whereNull('held_at')
+                ->exists();
+            abort_if($hasOrders, 409, 'This table has orders. Record payment before finishing it.');
+
+            $session->update([
+                'status' => 'closed',
+                'closed_at' => now(),
+                'closed_by' => $request->user()->id,
+                'active_table_number' => null,
+            ]);
+            RestaurantTable::query()->whereKey($session->table_id)->update(['is_enabled' => false]);
+
+            return response()->json(['message' => "Table {$session->table_number} closed."]);
+        }, 3);
     }
 }

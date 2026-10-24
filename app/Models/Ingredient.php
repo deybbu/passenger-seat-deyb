@@ -72,6 +72,17 @@ class Ingredient extends Model
             ->withPivot('quantity');
     }
 
+    public function scopeUsedByCurrentMenu(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereHas('menuItems', fn (Builder $items) => $items
+                ->where('is_active', true)
+                ->whereNull('archived_at'))
+                ->orWhereHas('preparationRecipeLines')
+                ->orWhereHas('preparationRecipe');
+        });
+    }
+
     public function isLowStock(): bool
     {
         return ! $this->manual_override && $this->usableStock() <= (float) $this->min_threshold;

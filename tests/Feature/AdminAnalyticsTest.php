@@ -16,9 +16,12 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\AddsOrderRecipe;
 
 class AdminAnalyticsTest extends TestCase
 {
+    use AddsOrderRecipe;
+
     private User $admin;
 
     private User $cashier;
@@ -71,6 +74,7 @@ class AdminAnalyticsTest extends TestCase
             'is_active' => true,
             'is_available' => true,
         ]);
+        $this->addOrderRecipe($this->menuItem, 'Analytics stock');
     }
 
     protected function tearDown(): void

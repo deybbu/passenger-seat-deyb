@@ -13,9 +13,12 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\AddsOrderRecipe;
 
 class AdminRegisterAndQrTest extends TestCase
 {
+    use AddsOrderRecipe;
+
     private User $admin;
 
     private MenuItem $menuItem;
@@ -58,6 +61,7 @@ class AdminRegisterAndQrTest extends TestCase
             'is_active' => true,
             'is_available' => true,
         ]);
+        $this->addOrderRecipe($this->menuItem, 'Admin QR stock');
     }
 
     public function test_admin_register_holds_resumes_and_records_payment_from_database_prices(): void

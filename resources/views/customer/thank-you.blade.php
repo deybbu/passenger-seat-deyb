@@ -16,7 +16,7 @@
                 <p class="mt-2 text-sm text-slate-600">Keep this number for payment and order follow-up.</p>
             </div>
             <div class="mt-7 flex items-center justify-between gap-4"><span class="text-slate-600">Service</span><span class="font-bold">{{ $order->type === 'dine_in' ? 'Dine-in · Table ' . $order->table_number : 'Take-out' }}</span></div>
-            <div class="mt-3 flex items-center justify-between gap-4"><span class="text-slate-600">Order status</span><span class="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-900">{{ ucfirst($order->status) }}</span></div>
+            <div class="mt-3 flex items-center justify-between gap-4"><span class="text-slate-600">Order status</span><span id="live-order-status" data-status-url="{{ route('orders.status', $order->reference_number) }}" aria-live="polite" class="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-900">{{ ucfirst($order->status) }}</span></div>
             <div class="mt-3 flex items-center justify-between gap-4"><span class="text-slate-600">Payment</span><span class="font-bold text-red-700">Unpaid · Pay at counter</span></div>
             <div class="mt-6 border-t border-slate-200 pt-5">
                 @foreach ($order->items as $item)
@@ -28,8 +28,27 @@
                 <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm"><p class="font-bold">Special instructions</p><p class="mt-1 text-slate-600">{{ $order->special_instructions }}</p></div>
             @endif
             <div class="mt-7 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"><strong>Next step:</strong> Proceed to the counter for payment. Our staff will confirm payment and prepare your order.</div>
-            <a href="{{ route('menu.index') }}" class="mt-6 inline-flex w-full justify-center rounded-xl bg-red-700 px-5 py-3 font-bold text-white hover:bg-red-800">Return to menu</a>
+            <a href="{{ route('menu') }}" class="mt-6 inline-flex w-full justify-center rounded-xl bg-red-700 px-5 py-3 font-bold text-white hover:bg-red-800">Return to menu</a>
         </div>
     </div>
 </section>
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    const badge = document.getElementById('live-order-status');
+    if (!badge) return;
+    const refresh = async () => {
+        try {
+            const response = await fetch(badge.dataset.statusUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            if (!response.ok) return;
+            const data = await response.json();
+            badge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+        } catch (_) {}
+    };
+    refresh();
+    window.setInterval(refresh, 5000);
+})();
+</script>
+@endpush

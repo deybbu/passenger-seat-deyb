@@ -156,6 +156,7 @@ final class TableSessionPaymentService
                 'closed_by' => $cashier->id,
                 'active_table_number' => null,
             ]);
+            $table->update(['is_enabled' => false]);
 
             ActivityLog::query()->create([
                 'user_id' => $cashier->id,

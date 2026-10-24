@@ -20,7 +20,7 @@ class OrderBoardController extends Controller
             'pending' => Order::query()->notHeld()->with('items')->where('status', 'pending')->oldest()->get(),
             'preparing' => Order::query()->notHeld()->with('items')->where('status', 'preparing')->oldest()->get(),
             'ready' => Order::query()->notHeld()->with('items')->where('status', 'ready')->oldest()->get(),
-            'completed' => Order::query()->notHeld()->with('items')->where('status', 'completed')
+            'served' => Order::query()->notHeld()->with('items')->where('status', 'served')
                 ->whereDate('updated_at', today())->latest('updated_at')->limit(15)->get(),
         ];
 
@@ -52,14 +52,19 @@ class OrderBoardController extends Controller
 
     public function complete(Request $request, Order $order, OrderService $orders): RedirectResponse
     {
-        abort_unless($request->user()->hasRole('cashier'), 403);
+        abort_unless(
+            $request->user()->hasRole('kitchen')
+                || $request->user()->hasRole('cashier')
+                || $request->user()->hasRole('manager'),
+            403,
+        );
 
         try {
-            $orders->transition($order, 'completed', $request->user());
+            $orders->transition($order, 'served', $request->user());
         } catch (\DomainException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', "{$order->reference_number} is completed.");
+        return back()->with('status', "{$order->reference_number} is served.");
     }
 }

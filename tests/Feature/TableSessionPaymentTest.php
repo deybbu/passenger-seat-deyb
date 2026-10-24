@@ -17,9 +17,12 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\AddsOrderRecipe;
 
 class TableSessionPaymentTest extends TestCase
 {
+    use AddsOrderRecipe;
+
     private MenuItem $menuItem;
 
     protected function setUp(): void
@@ -54,6 +57,7 @@ class TableSessionPaymentTest extends TestCase
             'is_active' => true,
             'is_available' => true,
         ]);
+        $this->addOrderRecipe($this->menuItem, 'Table payment stock');
     }
 
     public function test_cashier_settles_a_requested_session_and_manager_reopens_with_an_audited_reversal(): void

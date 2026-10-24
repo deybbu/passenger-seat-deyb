@@ -25,7 +25,7 @@
                 <label class="admin-field">Stage
                     <select name="stage" required>
                         <option value="">Choose a stage</option>
-                        @foreach(['Pre-consumer spoilage', 'Prep / production', 'Post-consumer plate'] as $stage)
+                        @foreach($wasteStages as $stage)
                             <option value="{{ $stage }}" @selected(old('stage') === $stage)>{{ $stage }}</option>
                         @endforeach
                     </select>
@@ -33,10 +33,13 @@
                 <label class="admin-field">Reason
                     <select name="reason" required>
                         <option value="">Choose a reason</option>
-                        @foreach(['Expired', 'Dropped/Spilled', 'Burned/Overcooked', 'Customer complaint', 'Incorrect prep'] as $reason)
+                        @foreach($wasteReasons as $reason)
                             <option value="{{ $reason }}" @selected(old('reason') === $reason)>{{ $reason }}</option>
                         @endforeach
                     </select>
+                </label>
+                <label class="admin-field">Other reason details
+                    <input type="text" name="other_reason" maxlength="80" value="{{ old('other_reason') }}" placeholder="Required when choosing Others">
                 </label>
                 <div class="admin-recipe-form-action"><button type="submit" class="btn-red">Log waste</button></div>
             </form>

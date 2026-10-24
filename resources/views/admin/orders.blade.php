@@ -14,7 +14,7 @@
                     'pending' => 'Pending',
                     'preparing' => 'Preparing',
                     'ready' => 'Ready',
-                    'completed' => 'Completed',
+                    'served' => 'Served',
                     'cancelled' => 'Cancelled',
                 ] as $key => $label)
                     <a href="{{ route('admin.orders', array_filter(['status' => $key, 'q' => $search ?? null])) }}"
@@ -47,7 +47,7 @@
                                 'pending' => 'badge-pending',
                                 'preparing' => 'badge-preparing',
                                 'ready' => 'badge-ready',
-                                'completed' => 'badge-completed',
+                                'served' => 'badge-completed',
                                 'cancelled' => 'badge-cancelled',
                                 default => 'badge-pending',
                             };

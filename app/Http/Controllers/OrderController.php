@@ -6,25 +6,28 @@ namespace App\Http\Controllers;
 
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\RestaurantTable;
+use App\Models\TableSession;
 use App\Services\OrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use RuntimeException;
 
 class OrderController extends Controller
 {
-    public function checkout(Request $request): View
+    public function checkout(Request $request): View|RedirectResponse
     {
         $cart = $request->session()->get('cart', []);
         if (empty($cart)) {
-            return redirect()->route('menu.index')->with('error', 'Your cart is empty.');
+            return redirect()->route('menu')->with('error', 'Your cart is empty.');
         }
 
-        $items = MenuItem::query()->whereIn('id', array_keys($cart))->where('is_available', true)->get()->keyBy('id');
+        $items = MenuItem::query()->withStockAvailability()->whereIn('id', array_keys($cart))
+            ->where('is_available', true)->get()->filter(fn (MenuItem $item): bool => $item->isOrderable())->keyBy('id');
         abort_if($items->count() !== count($cart), 409, 'A cart item is no longer available. Please review your cart.');
 
         $total = $items->sum(fn (MenuItem $item) => (float) $item->price * (int) $cart[$item->id]);
@@ -32,7 +35,7 @@ class OrderController extends Controller
         return view('customer.checkout', compact('items', 'cart', 'total'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, OrderService $orders): RedirectResponse
     {
         $validated = $request->validate([
             'type' => ['required', Rule::in(['dine_in', 'take_out'])],
@@ -43,51 +46,68 @@ class OrderController extends Controller
         $cart = $request->session()->get('cart', []);
         abort_if(!is_array($cart) || $cart === [], 422, 'Your cart is empty.');
 
-        $order = DB::transaction(function () use ($cart, $validated, $request): Order {
-            $items = MenuItem::query()
-                ->whereIn('id', array_keys($cart))
-                ->where('is_available', true)
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
-
-            if ($items->count() !== count($cart)) {
-                throw new RuntimeException('One or more items are no longer available. Please refresh your cart.');
+        $lines = collect($cart)->map(function ($quantity, $id): object {
+            $quantity = filter_var($quantity, FILTER_VALIDATE_INT);
+            if ($quantity === false || $quantity < 1 || $quantity > 99 || ! ctype_digit((string) $id)) {
+                throw ValidationException::withMessages(['items' => 'Your cart contains invalid item data.']);
             }
 
-            $total = 0.0;
-            foreach ($cart as $id => $quantity) {
-                $quantity = filter_var($quantity, FILTER_VALIDATE_INT);
-                if ($quantity === false || $quantity < 1 || $quantity > 99 || !$items->has((int) $id)) {
-                    throw new RuntimeException('Your cart contains invalid item data.');
+            return (object) ['item_id' => (int) $id, 'qty' => $quantity];
+        })->values();
+
+        $data = [
+            ...$validated,
+            'source' => 'website',
+            'customer_name' => 'Website guest',
+            'submission_token' => (string) Str::uuid(),
+        ];
+
+        try {
+            $order = DB::transaction(function () use ($data, $lines, $orders): Order {
+                if ($data['type'] === 'dine_in') {
+                    $table = RestaurantTable::query()
+                        ->where('table_number', $data['table_number'])
+                        ->where('is_enabled', true)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($table === null) {
+                        throw ValidationException::withMessages(['table_number' => 'Choose an active restaurant table.']);
+                    }
+
+                    $session = TableSession::query()
+                        ->where('table_id', $table->id)
+                        ->whereIn('status', ['open', 'bill_requested'])
+                        ->whereNull('closed_at')
+                        ->lockForUpdate()
+                        ->latest('opened_at')
+                        ->first();
+                    if ($session?->status === 'bill_requested' || $session?->bill_requested_at !== null) {
+                        throw new \DomainException('A bill has already been requested for this table. Cancel the request before ordering again.');
+                    }
+                    if ($session === null) {
+                        $session = TableSession::query()->create([
+                            'table_number' => $table->table_number,
+                            'table_id' => $table->id,
+                            'public_token' => (string) Str::random(64),
+                            'active_table_number' => $table->table_number,
+                            'status' => 'open',
+                            'opened_at' => now(),
+                        ]);
+                    }
+                    $data['table_id'] = $table->id;
+                    $data['table_session_id'] = $session->id;
                 }
-                $total += (float) $items[(int) $id]->price * $quantity;
-            }
 
-            $order = Order::create([
-                'reference_number' => $this->referenceNumber(),
-                'type' => $validated['type'],
-                'table_number' => $validated['type'] === 'dine_in' ? $validated['table_number'] : null,
-                'special_instructions' => $validated['special_instructions'] ?? null,
-                'total_amount' => round($total, 2),
-                'status' => 'pending',
-                'payment_status' => 'unpaid',
-            ]);
-
-            foreach ($cart as $id => $quantity) {
-                $item = $items[(int) $id];
-                $order->items()->create([
-                    'menu_item_id' => $item->id,
-                    'item_name' => $item->name,
-                    'quantity' => (int) $quantity,
-                    'price' => $item->price,
-                ]);
-            }
-
-            return $order;
-        }, 3);
+                return $orders->place($data, $lines);
+            }, 3);
+        } catch (\DomainException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
 
         $request->session()->forget('cart');
+        $tracked = $request->session()->get('website_order_references', []);
+        $tracked[$order->reference_number] = true;
+        $request->session()->put('website_order_references', array_slice($tracked, -20, null, true));
 
         return redirect()->route('orders.thank-you', $order->reference_number);
     }
@@ -101,6 +121,17 @@ class OrderController extends Controller
             ->firstOrFail();
 
         return view('customer.thank-you', compact('order'));
+    }
+
+    public function status(Request $request, string $reference): \Illuminate\Http\JsonResponse
+    {
+        abort_unless($request->session()->get("website_order_references.{$reference}") === true, 404);
+        $order = Order::query()->notHeld()->where('reference_number', $reference)->firstOrFail();
+
+        return response()->json([
+            'status' => (string) $order->status,
+            'server_now' => now('Asia/Manila')->getTimestamp() * 1000,
+        ]);
     }
 
     public function board(): View

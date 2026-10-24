@@ -11,7 +11,7 @@ const CONFIG = {
 const MENU = window.PS_MENU;
 const PHOTOS = window.PS_PHOTOS;
 const DETAILS = window.PS_DETAILS;
-const INITIAL_MENU_ITEM_IDS = window.PS_MENU_ITEMS.map(item => Number(item.id));
+const INITIAL_MENU_ITEM_IDS = window.PS_MENU_ITEMS.filter(item => item.available).map(item => Number(item.id));
 const MENU_ITEMS_BY_NAME = new Map(window.PS_MENU_ITEMS.map(item => [item.name, item]));
 const detail = it => DETAILS[it[0]] || ["", []];
 
@@ -28,22 +28,23 @@ let confirmed = null, notesVal = "";
 
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const table = String(window.PS_TABLE_NUMBER);
+const tableToken = String(window.PS_TABLE_TOKEN || "");
+const cartStorageKey = `ps_cart:${tableToken}`;
 const tableBtn = $("#tableNo");
 const showTable = () => tableBtn.textContent = "Table " + table;
 showTable();
 let mop = null;
 let session = { table, orders: [], bill: null };
-try {
-  const x = JSON.parse(ls.get("ps_session") || "null");
-  if (x && x.table === table && Array.isArray(x.orders)) session = x;
-} catch (e) {}
-const saveSession = () => ls.set("ps_session", JSON.stringify(session));
+session.tableToken = tableToken;
+const saveSession = () => {};
 const paymentLabel = method => ({ cash: "Cash", gcash: "GCash", card: "Card" }[method] || method);
 const paymentMethodKey = method => ({ Cash: "cash", GCash: "gcash", Card: "card" }[method]);
 const sessionFromServer = snapshot => {
   if (!snapshot) return { table, status: null, orderCount: 0, total: 0, orders: [], bill: null };
+  if (String(snapshot.table_number) !== table) throw new Error("This QR code returned a different table's order session. Please ask staff to check the table QR setup.");
   return {
     table,
+    tableToken,
     status: snapshot.status,
     orderCount: Number(snapshot.order_count),
     total: Number(snapshot.total),
@@ -84,8 +85,12 @@ async function refreshSession() {
   if (sessionRefreshInFlight) return;
   sessionRefreshInFlight = true;
   try {
-    const response = await fetch(CONFIG.sessionEndpoint, { headers: { "Accept": "application/json" } });
+    const response = await fetch(CONFIG.sessionEndpoint, { cache: "no-store", headers: { "Accept": "application/json" } });
     const data = await readResponse(response);
+    if (!data.session) {
+      window.location.reload();
+      return;
+    }
     if (!Array.isArray(data.available_item_ids) || data.available_item_ids.some(id => !Number.isInteger(id))) {
       throw new Error("The menu availability response has an invalid shape.");
     }
@@ -125,14 +130,14 @@ function billBlock() {
 }
 
 let cart = [];
-try { cart = JSON.parse(ls.get("ps_cart") || "[]"); } catch (e) {}
-const saveCart = () => ls.set("ps_cart", JSON.stringify(cart));
+try { cart = JSON.parse(ls.get(cartStorageKey) || "[]"); } catch (e) {}
+const saveCart = () => ls.set(cartStorageKey, JSON.stringify(cart));
 if (!Array.isArray(cart)) cart = [];
 const savedCart = cart;
 cart = savedCart.map(line => {
   if (!line || typeof line !== "object" || typeof line.name !== "string" || typeof line.opt !== "string") return null;
   const menuItem = MENU_ITEMS_BY_NAME.get(line.name);
-  if (!menuItem) return null;
+  if (!menuItem || !menuItem.available) return null;
   const variant = menuItem.variants.find(option => option.name === line.opt);
   if (menuItem.variants.length && !variant) return null;
   return {
@@ -285,6 +290,8 @@ function renderInfo() {
   const ingredients = detail(it)[1].length ? detail(it)[1] : description.split(/, | and /).map(part => part.trim()).filter(Boolean);
   const servingSize = (description.match(/Good for [^.)]+(?: persons| pax)/i) || [])[0];
   const missingPrice = it[0] === "Italy";
+  const menuItem = MENU_ITEMS_BY_NAME.get(it[0]);
+  const soldOut = menuItem && !menuItem.available;
   $("#code").textContent = code(it);
   $("#catName").textContent = MENU[cat][0];
   const pl = $("#plate"); const ph = PHOTOS[it[0]];
@@ -297,6 +304,11 @@ function renderInfo() {
     ${multi ? `<div class="chips">${o.map((x, j) => `<button class="chip ${j === opt ? "on" : ""}" data-o="${j}">${x[0]}</button>`).join("")}</div>` : ""}
     <div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">–</button><span>${qty}</span><button data-q="1" aria-label="More">+</button></div>
     ${missingPrice ? `<button class="add" disabled>Price not provided</button>` : `<button class="add" data-add><span>Add to order</span><span>${peso(o[opt][1] * qty)}</span></button>`}</div>`;
+  if (soldOut) {
+    const buy = $("#info .buy");
+    buy.querySelectorAll("button").forEach(button => { button.disabled = true; });
+    buy.insertAdjacentHTML("beforebegin", '<p class="stock-note">Currently unavailable: stock or recipe setup needs attention.</p>');
+  }
 }
 $("#info").onclick = e => {
   const t = e.target.closest("button"); if (!t) return;
@@ -310,7 +322,7 @@ $("#info").onclick = e => {
 function addToCart() {
   const it = items[active], o = optsOf(it)[opt], menuItem = MENU_ITEMS_BY_NAME.get(it[0]);
   const variant = menuItem?.variants.find(option => option.name === o[0]);
-  if (!menuItem || (menuItem.variants.length && !variant)) {
+  if (!menuItem || !menuItem.available || (menuItem.variants.length && !variant)) {
     alert("This dish or size is no longer available. Refresh the page and try again.");
     return;
   }

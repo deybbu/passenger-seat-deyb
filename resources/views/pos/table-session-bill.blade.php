@@ -6,7 +6,7 @@
 @section('content')
     @php
         $unfinishedOrders = $tableSession->orders->filter(
-            fn ($order) => ! in_array($order->status, ['completed', 'cancelled'], true),
+            fn ($order) => ! in_array($order->status, ['served', 'cancelled'], true),
         );
     @endphp
 
@@ -23,7 +23,7 @@
         <div class="card" role="status" style="border-left:4px solid #d97706;margin-bottom:16px">
             <strong>Kitchen warning:</strong>
             {{ $unfinishedOrders->count() }} batch{{ $unfinishedOrders->count() === 1 ? '' : 'es' }}
-            {{ $unfinishedOrders->count() === 1 ? 'is' : 'are' }} not completed yet. You may still bill out this table.
+            {{ $unfinishedOrders->count() === 1 ? 'is' : 'are' }} not served yet. You may still bill out this table.
         </div>
     @endif
 

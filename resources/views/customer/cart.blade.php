@@ -12,7 +12,7 @@
         <div class="mt-7 rounded-2xl border border-slate-200 bg-white p-10 text-center">
             <h2 class="text-xl font-bold">Your cart is waiting for passengers.</h2>
             <p class="mt-2 text-slate-600">Add a meal from the boarding menu to get started.</p>
-            <a href="{{ route('menu.index') }}" class="mt-5 inline-flex rounded-xl bg-red-700 px-5 py-3 font-bold text-white">Browse menu</a>
+            <a href="{{ route('menu') }}" class="mt-5 inline-flex rounded-xl bg-red-700 px-5 py-3 font-bold text-white">Browse menu</a>
         </div>
     @else
         <div class="mt-7 overflow-hidden rounded-2xl border border-slate-200 bg-white">

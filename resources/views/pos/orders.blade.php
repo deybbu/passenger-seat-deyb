@@ -9,7 +9,7 @@
             'pending' => ['Pending', 'b-p'],
             'preparing' => ['Preparing', 'b-c'],
             'ready' => ['Ready', 'b-r'],
-            'completed' => ['Completed', 'b-d'],
+            'served' => ['Served', 'b-d'],
             'cancelled' => ['Cancelled', ''],
         ];
     @endphp
@@ -39,7 +39,7 @@
                                 <form method="POST" action="{{ route('staff.orders.complete', $order) }}">
                                     @csrf
                                     @method('PATCH')
-                                    <button class="btn sm red" type="submit">Mark Completed</button>
+                                <button class="btn sm red" type="submit">Mark Served</button>
                                 </form>
                             @endif
                             @if (in_array($status, ['pending', 'preparing'], true) && ! $order->isPaid())

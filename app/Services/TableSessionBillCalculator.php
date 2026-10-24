@@ -34,6 +34,11 @@ final class TableSessionBillCalculator
             }
 
             $orders = $session->orders()
+                ->when($session->table_id !== null, fn ($query) => $query
+                    ->where(fn ($orders) => $orders->whereNull('source')->orWhere('source', '!=', 'table_qr'))
+                    ->orWhere(fn ($orders) => $orders
+                        ->where('table_session_id', $session->id)
+                        ->where('table_id', $session->table_id)))
                 ->with(['items' => fn ($query) => $query->whereNull('cancelled_at')])
                 ->orderBy('batch_number')
                 ->orderBy('id')
@@ -56,6 +61,7 @@ final class TableSessionBillCalculator
             ]);
 
             return [
+                'table_number' => $session->table_number,
                 'status' => $session->status,
                 'order_count' => $billableOrders->count(),
                 'subtotal' => $subtotal,

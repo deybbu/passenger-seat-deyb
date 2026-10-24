@@ -11,6 +11,8 @@ use App\Http\Controllers\Admin\TableQrController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CustomerMenuController;
 use App\Http\Controllers\CustomerQrOrderController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\EventInquiryController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
@@ -23,6 +25,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/menu', [CustomerMenuController::class, 'index'])->name('menu');
+Route::get('/cart', [CartController::class, 'show'])->name('cart.show');
+Route::post('/cart/{menuItem}', [CartController::class, 'add'])->name('cart.add');
+Route::patch('/cart/{menuItem}', [CartController::class, 'update'])->name('cart.update');
+Route::delete('/cart/{menuItem}', [CartController::class, 'remove'])->name('cart.remove');
+Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
+Route::post('/checkout', [OrderController::class, 'store'])->name('orders.store');
+Route::get('/orders/{reference}/thank-you', [OrderController::class, 'thankYou'])->name('orders.thank-you');
+Route::get('/orders/{reference}/status', [OrderController::class, 'status'])
+    ->middleware('throttle:120,1')
+    ->name('orders.status');
 Route::get('/order', [CustomerQrOrderController::class, 'show'])->name('customer.qr.show');
 Route::get('/order/{tableToken}', [CustomerQrOrderController::class, 'showTable'])
     ->name('customer.order.show');
@@ -77,16 +89,21 @@ Route::middleware(['auth', 'role:kitchen,cashier,manager'])
             ->middleware('role:kitchen,cashier')
             ->name('orders.status');
         Route::patch('/orders/{order}/complete', [OrderBoardController::class, 'complete'])
-            ->middleware('role:cashier')
+            ->middleware('role:kitchen,cashier,manager')
             ->name('orders.complete');
     });
 
-Route::middleware(['auth', 'role:kitchen'])
+Route::middleware(['auth', 'role:kitchen,manager,admin'])
     ->prefix('staff/kitchen')
     ->name('staff.kitchen.')
     ->controller(KitchenController::class)
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
+        Route::get('/orders', 'orders')->name('orders.data');
+        Route::patch('/orders/{order}/status', 'transition')->name('orders.status');
+        Route::get('/inventory-data', 'inventoryJson')->name('inventory.data');
+        Route::get('/waste-data', 'wasteJson')->name('waste.data');
+        Route::post('/waste', 'recordWaste')->name('waste.store');
         Route::get('/board', 'board')->name('board');
         Route::get('/inventory', 'inventory')->name('inventory');
     });
@@ -116,6 +133,8 @@ Route::middleware(['auth', 'role:cashier,manager,admin'])
         Route::post('/bills/{bill}/pay', [POSController::class, 'payBill'])->name('bills.pay');
         Route::post('/table-sessions/{tableSession}/reopen', [POSController::class, 'reopenTableSession'])
             ->name('table-session-reopen');
+        Route::post('/table-sessions/{tableSession}/close-empty', [TableSessionController::class, 'closeEmpty'])
+            ->name('table-session-close-empty');
         Route::post('/tables/{restaurantTable}/paid', [POSController::class, 'markTablePaid'])
             ->name('table-paid');
         Route::get('/orders/{order}/receipt', [POSController::class, 'receipt'])->name('receipt');
@@ -132,10 +151,43 @@ Route::middleware(['auth', 'role:cashier'])
         Route::patch('/{tableSession}/close', [TableSessionController::class, 'close'])->name('close');
     });
 
+Route::get('/staff/inventory', [InventoryController::class, 'index'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('inventory.index');
+Route::redirect('/staff/inventory/signed-out', '/staff/login')
+    ->name('inventory.signed-out');
+Route::post('/staff/inventory/logout', [InventoryController::class, 'logout'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.logout');
+Route::post('/staff/inventory/sync', [InventoryController::class, 'syncOfflineActions'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.sync');
+Route::post('/staff/inventory/packages', [InventoryController::class, 'registerPackage'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.packages.store');
+Route::post('/staff/inventory/purchase-orders', [InventoryController::class, 'storePurchaseOrder'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.purchase-orders.store');
+Route::post('/staff/inventory/waste/entry', [InventoryController::class, 'storeWasteEntry'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.waste.store');
+Route::post('/staff/inventory/counts', [InventoryController::class, 'storePhysicalCount'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.counts.store');
+Route::patch('/staff/inventory/counts/{physicalCount}/approve', [InventoryController::class, 'approvePhysicalCount'])
+    ->middleware(['auth', 'role:manager,admin'])
+    ->name('staff.inventory.counts.approve');
+Route::patch('/staff/inventory/purchase-orders/{purchaseOrder}/approve', [InventoryController::class, 'approvePurchaseOrder'])
+    ->middleware(['auth', 'role:manager,admin'])
+    ->name('staff.inventory.purchase-orders.approve');
+Route::get('/staff/inventory/packages/{package}/label', [InventoryController::class, 'packageLabel'])
+    ->middleware(['auth', 'role:inventory,manager,admin'])
+    ->name('staff.inventory.packages.label');
+
 Route::middleware(['auth', 'role:inventory'])
     ->prefix('staff/inventory')
     ->group(function (): void {
-        Route::get('/', [InventoryController::class, 'index'])->name('inventory.index');
+
         Route::get('/logs', [InventoryController::class, 'logs'])->name('inventory.logs');
         Route::post('/', [InventoryController::class, 'store'])->name('staff.inventory.store');
         Route::post('/barcode', [InventoryController::class, 'assignBarcode'])->name('staff.inventory.barcode');
@@ -147,7 +199,6 @@ Route::middleware(['auth', 'role:inventory'])
         Route::post('/receive/lookup', [InventoryController::class, 'lookupBarcode'])->name('staff.inventory.receive.lookup');
         Route::post('/receive/preview', [InventoryController::class, 'previewReceipt'])->name('staff.inventory.receive.preview');
         Route::post('/receive/confirm', [InventoryController::class, 'confirmReceipt'])->name('staff.inventory.receive.confirm');
-        Route::post('/packages', [InventoryController::class, 'registerPackage'])->name('staff.inventory.packages.store');
         Route::patch('/{ingredient}', [InventoryController::class, 'update'])->name('staff.inventory.update');
         Route::post('/{ingredient}/logs', [InventoryController::class, 'log'])->name('staff.inventory.log');
         Route::delete('/{ingredient}', [InventoryController::class, 'destroy'])->name('staff.inventory.destroy');
@@ -163,6 +214,7 @@ Route::middleware(['auth', 'role:admin'])
         Route::post('/api/reference/menu', [ModuleController::class, 'referenceMenuStore'])->name('api.reference.menu.store');
         Route::post('/api/reference/recipe-target', [ModuleController::class, 'referenceRecipeTarget'])->name('api.reference.recipe.target');
         Route::post('/api/reference/purchase-orders/{ingredient}', [AdminInventoryController::class, 'referencePurchaseOrder'])->name('api.reference.purchase-orders.store');
+        Route::patch('/api/reference/purchase-orders/{purchaseOrder}/approve', [AdminInventoryController::class, 'referenceApprovePurchaseOrder'])->name('api.reference.purchase-orders.approve');
         Route::patch('/api/reference/purchase-order-items/{purchaseOrderItem}/close-short', [AdminInventoryController::class, 'referenceCloseShort'])->name('api.reference.purchase-orders.close-short');
         Route::post('/api/reference/waste', [AdminInventoryController::class, 'referenceWaste'])->name('api.reference.waste.store');
         Route::post('/api/reference/barcode/lookup', [AdminInventoryController::class, 'lookupBarcode'])->name('api.reference.barcode.lookup');

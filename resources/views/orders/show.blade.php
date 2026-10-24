@@ -46,7 +46,7 @@
         </section>
 
         <div class="mt-5 flex flex-wrap justify-center gap-3">
-            <a href="{{ route('menu.index') }}" class="rounded-full bg-brand-600 px-6 py-3 font-semibold text-white hover:bg-brand-700">Back to menu</a>
+            <a href="{{ route('menu') }}" class="rounded-full bg-brand-600 px-6 py-3 font-semibold text-white hover:bg-brand-700">Back to menu</a>
         </div>
     </div>
 @endsection

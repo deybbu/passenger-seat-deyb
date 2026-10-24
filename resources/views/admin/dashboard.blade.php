@@ -232,7 +232,7 @@
                                     'pending' => 'badge-pending',
                                     'preparing' => 'badge-preparing',
                                     'ready' => 'badge-ready',
-                                    'completed' => 'badge-completed',
+                                    'served' => 'badge-completed',
                                     'cancelled' => 'badge-cancelled',
                                     default => 'badge-pending',
                                 };
