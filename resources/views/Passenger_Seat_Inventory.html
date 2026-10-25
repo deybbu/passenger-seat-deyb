@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Passenger Seat · Kitchen Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--red:#C62828;--deep:#A61B1B;--bg:#F8F8FA;--gray:#F1F2F4;--ink:#202124;--mute:#6B7280;--line:#E5E7EB;--ok:#15803D;--warn:#B45309;--err:#DC2626;--surf:#fff;--glass:rgba(255,255,255,.8);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141214;--gray:#241f21;--ink:#f3eded;--mute:#a79c9e;--line:#3a3033;--surf:#1d1819;--glass:rgba(32,26,28,.8);--red:#e04848}}
+:root[data-theme=dark]{--bg:#141214;--gray:#241f21;--ink:#f3eded;--mute:#a79c9e;--line:#3a3033;--surf:#1d1819;--glass:rgba(32,26,28,.8);--red:#e04848}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,system-ui,sans-serif}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-size:19px}.crumb{font-size:11px;color:var(--mute)}
+main{max-width:1100px;margin:0 auto;padding:16px 14px 40px;display:grid;gap:14px}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;color:var(--mute);font:600 14px Inter;padding:10px 13px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--red);border-color:var(--red)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(90,20,20,.06)}
+.card h2{margin:0 0 10px;font-size:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.g2{grid-template-columns:1fr}}
+.btn{min-height:42px;border-radius:10px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font:600 13px Inter;cursor:pointer;padding:0 14px}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{min-height:32px;padding:0 10px;font-size:12px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+input,select{font:inherit;color:var(--ink);background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-height:42px;max-width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}.row label{display:grid;gap:3px;font-size:12px;color:var(--mute);font-weight:600}
+.msg{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:600;font-size:13px;background:var(--gray);color:var(--mute)}
+.msg.ok{background:#dcfce7;color:var(--ok)}.msg.bad{background:#fee2e2;color:var(--err)}
+.pkg{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px}
+.pkg dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 10px}.pkg dt{color:var(--mute)}.pkg dd{margin:0;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:12px;color:var(--mute);align-items:center}
+.chip{border:1px dashed var(--mute);background:none;color:var(--ink);border-radius:99px;padding:4px 10px;font:12px Inter;cursor:pointer}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.ic{border:1px solid var(--line);border-left:6px solid var(--ok);border-radius:12px;padding:12px;background:var(--surf)}
+.ic.y{border-left-color:#F59E0B}.ic.r{border-left-color:var(--err)}.ic h3{margin:0;font-size:15px}
+.big{font-size:22px;font-weight:700}.bt{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:5px 8px;margin-top:5px;border-radius:8px;background:#dcfce7;color:var(--ok)}
+.bt.y{background:#fef3c7;color:var(--warn)}.bt.r{background:#fee2e2;color:var(--err)}.bt.lock{text-decoration:line-through;opacity:.8}
+.al{display:grid;gap:6px;margin-bottom:12px}.al div{padding:8px 12px;border-radius:10px;font-weight:600;font-size:13px;background:#fee2e2;color:var(--err)}.al .w{background:#fef3c7;color:var(--warn)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:var(--mute);font-size:12px}th,td{padding:7px 6px;border-bottom:1px solid var(--line)}
+.hide{display:none!important}.mute{color:var(--mute)}
+body[data-role=staff] .mg{display:none!important}
+dialog{border:0;border-radius:14px;padding:20px;max-width:340px;background:var(--surf);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}dialog::backdrop{background:rgba(0,0,0,.5)}
+#toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:9}#toast.on{opacity:1}
+.scanner{max-width:420px;margin:0 auto;width:100%;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.cam{position:relative;aspect-ratio:1/1;border-radius:14px;background:#111;overflow:hidden;display:grid;place-items:center}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.frame{position:relative;width:62%;aspect-ratio:1;border:2px solid var(--red);border-radius:14px;background:rgba(255,255,255,.04)}
+.frame.live::after{content:"";position:absolute;left:6%;right:6%;top:10%;height:2px;background:var(--red);box-shadow:0 0 10px var(--red);animation:sweep 2s ease-in-out infinite alternate}
+@keyframes sweep{to{top:88%}}
+.hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-size:11px;padding:0 10px}
+.btns{display:flex;gap:8px;margin-top:12px}.btns>*{flex:1}.btn{min-height:44px}
+.manual{display:flex;gap:8px;margin-top:12px}.manual input{flex:1;min-width:0}
+.pkg{margin-top:12px;padding:14px;border-radius:14px}.pkg h3{margin:0 0 6px;font-size:14px}.pkg p{margin:2px 0;color:var(--mute)}.pkg .big2{color:var(--ink);font-weight:700}
+.qty{display:inline-flex;align-items:center;gap:8px;margin:6px 0}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.msg.warn{background:#fef3c7;color:#92400e}
+
+/* Remove decorative shadows across the interface while keeping focus and scanner overlays visible. */
+*:not(.admin-scanner-corners) { box-shadow: none !important; text-shadow: none !important; }
+*:focus-visible { outline: 2px solid var(--red, currentColor) !important; outline-offset: 2px !important; }
+</style></head>
+<body data-role="staff">
+<div class="top"><div><h1>Passenger Seat</h1><div class="crumb">Kitchen inventory · FEFO</div></div>
+<label class="crumb">Role <select id="role"><option value="staff">Kitchen Staff</option><option value="mgr">Manager / Owner</option></select></label></div>
+<main>
+<div class="tabs" id="tabs" role="tablist"></div>
+
+<section data-v="rec">
+ <div class="card scanner">
+  <h2>Scan package</h2>
+  <div class="cam"><video id="vid" playsinline muted class="hide"></video><div class="frame" id="frame"></div><div class="hint" id="hint">Point the rear camera at the package barcode</div></div>
+  <div class="btns"><button class="btn red" id="camBtn">Start camera</button><button class="btn" id="sample">Try sample scan</button></div>
+  <form class="manual" id="manual"><input id="code" autocomplete="off" aria-label="Barcode" placeholder="Type or scan a barcode"><button class="btn" type="submit">Look up</button></form>
+  <div class="chips">Samples: <span id="chips"></span></div>
+  <div class="msg" id="msg" aria-live="polite">Waiting for a barcode. Stock changes only after you confirm.</div>
+  <div class="pkg hide" id="pkg" style="border:1px solid var(--line)">
+   <h3 id="pName"></h3><p id="pMeta"></p><p id="pCur"></p>
+   <p class="qty"><b id="pQty"></b></p>
+   <p class="big2" id="pAfter"></p>
+   <label class="mute">Storage zone <select id="pz"></select></label>
+   <div class="btns"><button class="btn red" id="ok">Confirm receipt</button><button class="btn" id="no">Rescan</button></div>
+  </div>
+ </div></section>
+<section data-v="fresh" class="hide"><div class="card" style="max-width:520px;margin:0 auto"><h2>Fresh goods (no barcode)</h2>
+  <form id="ff"><div class="row"><label>Name<input id="fn" required placeholder="e.g. Fresh squid"></label><label>Category<select id="fc"><option>Seafood</option><option>Produce</option><option>Meat</option><option>Other</option></select></label></div>
+  <div class="row"><label>Quantity<input id="fq" type="number" min="0.01" step="any" required style="width:90px"></label><label>Unit<select id="fu"><option>kg</option><option>pc</option></select></label><label>Expires<input id="fe" type="date" required></label></div>
+  <div class="row"><label>Zone<select id="fz"></select></label><button class="btn red">Add to stock</button></div></form></div></section>
+
+<section data-v="dash" class="hide card"><h2>Stock by expiry (oldest used first)</h2><div class="al" id="al"></div><div class="cards" id="cards"></div></section>
+
+
+
+<section data-v="prep" class="hide"><div class="g2">
+ <div class="card"><h2>Raw to prep</h2><div class="row"><label>Raw item<select id="pr"></select></label><label>Qty (kg)<input id="pq" type="number" min="0.1" step="any" style="width:90px"></label><button class="btn red" id="pgo">Log prep</button></div><div class="msg" id="pm">Marinating moves raw stock into the prepped item.</div></div>
+ <div class="card"><h2>Log waste</h2><div class="row"><label>Item<select id="wi"></select></label><label>Qty<input id="wq" type="number" min="0.01" step="any" style="width:90px"></label><label>Type<select id="wt"><option>Pre-Cook Spoilage</option><option>Over-Prep Waste</option><option>Boodle Return</option></select></label><button class="btn red" id="wgo">Log waste</button></div>
+ <h2 class="mg">Loss report (managers)</h2><table class="mg"><tbody id="wr"></tbody></table></div></div></section>
+
+<section data-v="rcp" class="mg hide card"><h2>Recipe matrix, costs and par levels</h2><p class="mute">Recipes are in grams (or pieces). Yield loss means raw stock needed = portion ÷ (1 − loss).</p>
+<div class="wrap"><table><thead><tr><th>Ingredient</th><th>Unit</th><th>Cost per unit (₱)</th><th>Yield loss %</th><th>Par minimum</th></tr></thead><tbody id="rb"></tbody></table></div></section>
+
+<section data-v="log" class="hide card"><h2>Movement history</h2><div class="wrap"><table><thead><tr><th>Time</th><th>By</th><th>Action</th><th>Item</th><th>Change</th><th>Note</th></tr></thead><tbody id="lb"></tbody></table></div></section>
+</main>
+<dialog id="pop"><p id="pt" style="font-weight:700;margin-top:0"></p><button class="btn red" onclick="pop.close()">OK</button></dialog>
+<div id="toast" role="status"></div>
+<script>
+const $=id=>document.getElementById(id),pop=$("pop");
+const D=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10),r2=n=>Math.round(n*100)/100;
+const ZONES=["Walk-in Freezer","Chiller","Dry Pantry Room"];
+const items=[
+{id:"CH",name:"Chicken (raw)",cat:"Meat",u:"kg",min:15,cost:180,loss:.1,z:1,prep:"PI"},
+{id:"PK",name:"Pork liempo",cat:"Meat",u:"kg",min:15,cost:320,loss:.15,z:0},
+{id:"RI",name:"Jasmine rice",cat:"Dry goods",u:"kg",min:20,cost:55,loss:0,z:2},
+{id:"OK",name:"Okra",cat:"Produce",u:"pc",min:30,cost:4,loss:0,z:1},
+{id:"EG",name:"Eggplant",cat:"Produce",u:"pc",min:20,cost:12,loss:0,z:1},
+{id:"TE",name:"Iced tea powder",cat:"Beverage",u:"kg",min:2,cost:600,loss:0,z:2},
+{id:"PI",name:"Prepped Inasal chicken",cat:"Prepped",u:"kg",min:0,cost:200,loss:0,z:1}];
+let batches=[
+{id:"B-0901",it:"PK",q:8,exp:D(-1),z:0},{id:"B-1101",it:"CH",q:20,exp:D(1),z:1},{id:"B-1102",it:"CH",q:30,exp:D(9),z:0},
+{id:"B-2201",it:"PK",q:25,exp:D(3),z:0},{id:"B-3301",it:"RI",q:50,exp:D(120),z:2},{id:"B-4401",it:"OK",q:60,exp:D(2),z:1},
+{id:"B-5501",it:"EG",q:40,exp:D(5),z:1},{id:"B-6601",it:"TE",q:5,exp:D(200),z:2}];
+const menu=[
+{n:"Pilipinas Boodle",p:1450,r:{CH:400,PK:500,RI:600,OK:6,EG:4}},
+{n:"Chicken Inasal plate",p:210,r:{PI:250,RI:200}},
+{n:"Iced tea pitcher",p:120,r:{TE:60}}];
+const samples=[["CH",50,D(10),"B2210","4800101002210"],["PK",20,D(7),"B3318","4800104003318"],["RI",25,D(200),"B5521","4800102005521"],["TE",2,D(300),"B7701","4800107007701"]]
+ .map(s=>({code:s[0]+"-"+s[1]+"-"+s[2].replace(/-/g,"")+"-"+s[3],it:s[0],q:s[1],exp:s[2],id:s[3],num:s[4]}));
+const log=[],seen=new Set();let cur=null,tab="rec",stream,timer,mc=0;
+const it=id=>items.find(i=>i.id===id),role=()=>$("role").value;
+const days=b=>Math.round((new Date(b.exp)-new Date(D(0)))/864e5),locked=b=>days(b)<0&&!b.ov;
+const usable=k=>batches.filter(b=>b.it===k&&b.q>0&&!locked(b)).sort((a,b)=>a.exp<b.exp?-1:1);
+const avail=k=>usable(k).reduce((s,b)=>s+b.q,0);
+const conv=i=>i.u==="kg"?1000:1,raw=(k,a)=>a/conv(it(k))/(1-it(k).loss);
+const maxQ=m=>Math.floor(Math.min(...Object.entries(m.r).map(([k,v])=>avail(k)/raw(k,v)))+1e-9);
+const toast=t=>{$("toast").textContent=t;$("toast").classList.add("on");setTimeout(()=>$("toast").classList.remove("on"),2200)};
+const msg=(c,t)=>{$("msg").className="msg "+c;$("msg").textContent=t};
+const stamp=(a,n,d,note)=>{log.unshift({t:new Date().toLocaleTimeString(),by:role()==="mgr"?"Manager":"Staff",a,n,d,note:note||""})};
+function take(k,qty,note,incLocked){ // FEFO drain
+  let left=qty;const used=[];
+  (incLocked?batches.filter(b=>b.it===k&&b.q>0).sort((a,b)=>a.exp<b.exp?-1:1):usable(k)).forEach(b=>{if(left<=0)return;const t=Math.min(b.q,left);b.q=r2(b.q-t);left=r2(left-t);used.push(b.id+" −"+r2(t))});
+  stamp(note[0],it(k).name,-r2(qty-left),note[1]+" · "+used.join(", "));return left<=0}
+
+/* receiving */
+function parse(raw){raw=raw.trim().replace(/\s/g,"");
+  let s=samples.find(x=>x.code===raw||x.num===raw);if(s)return{...s,z:it(s.it).z};
+  const m=raw.split("-");if(m.length===4&&it(m[0])&&/^\d{8}$/.test(m[2]))return{it:m[0],q:+m[1],exp:m[2].replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"),id:m[3],z:it(m[0]).z};return null}
+function hidePkg(){cur=null;$("pkg").classList.add("hide")}
+function lookup(raw){const code=raw.trim().replace(/\s/g,"");if(!code)return;const p=parse(code);
+  if(!p){hidePkg();return msg("bad","Invalid barcode: "+code+". It isn't registered to any package.")}
+  if(seen.has(p.id)){hidePkg();$("pt").textContent="Error: This specific batch has already been checked into inventory.";pop.showModal();return msg("bad","Duplicate receipt: batch "+p.id+" was already received.")}
+  cur={...p};stopCam();showPkg();msg("ok","Package found. Check the details, then confirm.")}
+function showPkg(){const i=it(cur.it),a=r2(avail(i.id));$("pkg").classList.remove("hide");
+  $("pName").textContent=i.name+" · Batch "+cur.id;$("pMeta").textContent="Expiry "+cur.exp+" · "+i.cat;$("pCur").textContent="Current stock: "+a+" "+i.u;
+  $("pQty").textContent="Package quantity: +"+cur.q+" "+i.u;$("pAfter").textContent="Expected after receipt: "+r2(a+cur.q)+" "+i.u;$("pz").value=cur.z}
+$("ok").onclick=()=>{if(!cur)return;if(seen.has(cur.id)){$("pt").textContent="Error: This specific batch has already been checked into inventory.";pop.showModal();return}
+  const i=it(cur.it),z=+$("pz").value;seen.add(cur.id);batches.push({id:cur.id,it:cur.it,q:cur.q,exp:cur.exp,z});
+  stamp("Received",i.name,cur.q,"Batch "+cur.id+" → "+ZONES[z]);msg("ok","+"+cur.q+" "+i.u+" "+i.name+" recorded. Stock is now "+r2(avail(i.id))+" "+i.u+".");toast("Saved: "+i.name+" +"+cur.q+" "+i.u);hidePkg();render()};
+$("no").onclick=()=>{hidePkg();msg("","Waiting for a barcode.");$("code").focus()};
+$("manual").onsubmit=e=>{e.preventDefault();lookup($("code").value);$("code").value=""};
+$("sample").onclick=()=>{const f=samples.filter(x=>!seen.has(x.id));lookup((f[0]||samples[0]).code)};
+$("chips").innerHTML=samples.map(s=>"<button class='chip' data-c='"+s.code+"'>"+it(s.it).name+"</button>").join("")+"<button class='chip' data-c='0000000000000'>Unknown</button>";
+$("chips").onclick=e=>{if(e.target.dataset.c)lookup(e.target.dataset.c)};
+$("ff").onsubmit=e=>{e.preventDefault();const n=$("fn").value.trim();let i=items.find(x=>x.name.toLowerCase()===n.toLowerCase());
+  if(!i){i={id:"X"+(++mc),name:n,cat:$("fc").value,u:$("fu").value,min:0,cost:0,loss:0,z:+$("fz").value};items.push(i)}
+  const id="M-"+Date.now().toString().slice(-5);batches.push({id,it:i.id,q:+$("fq").value,exp:$("fe").value,z:+$("fz").value});
+  stamp("Manual intake",i.name,+$("fq").value,id+" → "+ZONES[+$("fz").value]);toast("Added "+i.name);e.target.reset();render()};
+async function startCam(){if(stream){stopCam();return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){msg("warn","Camera isn't available in this browser or page. Use the manual field.");return}
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    const v=$("vid");v.srcObject=stream;v.classList.remove("hide");await v.play();
+    $("frame").classList.add("live");$("camBtn").textContent="Stop camera";$("hint").textContent="Hold the barcode inside the red frame";
+    if(!("BarcodeDetector" in window)){msg("warn","Camera is on, but this browser can't read barcodes automatically. Type the code below.");return}
+    const det=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","upc_a","upc_e","qr_code"]});msg("","Scanning…");
+    timer=setInterval(async()=>{try{const r=await det.detect(v);if(r.length)lookup(r[0].rawValue)}catch(e){}},300)}
+  catch(err){stopCam();msg("bad",err.name==="NotAllowedError"?"Camera permission was denied. Allow camera access in your browser settings, or type the code.":"Couldn't start the camera ("+err.name+"). Use the manual field.")}}
+function stopCam(){clearInterval(timer);timer=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  $("vid").classList.add("hide");$("frame").classList.remove("live");$("camBtn").textContent="Start camera";$("hint").textContent="Point the rear camera at the package barcode"}
+$("camBtn").onclick=startCam;
+
+/* prep */
+$("pgo").onclick=()=>{const k=$("pr").value,q=+$("pq").value,i=it(k);if(!q)return;
+  if(q>avail(k)){$("pm").className="msg bad";$("pm").textContent="Only "+avail(k)+" kg usable.";return}
+  const e=usable(k)[0].exp;take(k,q,["Prep out","→ "+it(i.prep).name]);const id="P-"+Date.now().toString().slice(-5);
+  batches.push({id,it:i.prep,q,exp:e<D(2)?e:D(2),z:1});stamp("Prep in",it(i.prep).name,q,id);
+  $("pm").className="msg ok";$("pm").textContent=q+" kg moved from "+i.name+" to "+it(i.prep).name;render()};
+$("wgo").onclick=()=>{const k=$("wi").value,q=+$("wq").value;if(!q)return;
+  take(k,q,["Waste",$("wt").value],$("wt").value==="Pre-Cook Spoilage");wasteLog.push({t:$("wt").value,v:q*it(k).cost});toast("Waste logged");render()};
+const wasteLog=[];
+$("rb").oninput=e=>{const t=e.target,i=it(t.dataset.i);if(t.dataset.f==="loss")i.loss=Math.min(.9,+t.value/100);else i[t.dataset.f]=+t.value;render(1)};
+function override(id){const b=batches.find(x=>x.id===id);b.ov=true;stamp("Override lock",it(b.it).name,0,id);render()}
+
+/* render */
+function render(skip){
+  const sel=(el,list)=>{const v=$(el).value;$(el).innerHTML=list;if(v)$(el).value=v};
+  ["pz","fz"].forEach(x=>sel(x,ZONES.map((z,i)=>"<option value="+i+">"+z+"</option>").join("")));
+  sel("pr",items.filter(i=>i.prep).map(i=>"<option value="+i.id+">"+i.name+"</option>").join(""));
+  sel("wi",items.map(i=>"<option value="+i.id+">"+i.name+"</option>").join(""));
+  let al="";
+  items.forEach(i=>{if(i.min&&avail(i.id)<i.min)al+="<div>Below par: "+i.name+" has "+r2(avail(i.id))+" "+i.u+" (min "+i.min+")</div>"});
+  menu.forEach(m=>{if(maxQ(m)<1)al+="<div>Blocked: "+m.n+" can't be served. Short on "+Object.keys(m.r).filter(k=>avail(k)<raw(k,m.r[k])).map(k=>it(k).name).join(", ")+"</div>"});
+  batches.filter(b=>locked(b)&&b.q>0).forEach(b=>al+="<div class='w'>Locked: "+it(b.it).name+" batch "+b.id+" expired "+b.exp+" ("+b.q+" "+it(b.it).u+"). Log as Pre-Cook Spoilage.</div>");
+  $("al").innerHTML=al||"<div class='w' style='background:#dcfce7;color:var(--ok)'>No alerts</div>";
+  $("cards").innerHTML=items.map(i=>{const bs=batches.filter(b=>b.it===i.id&&b.q>0).sort((a,b)=>a.exp<b.exp?-1:1),u=usable(i.id),d=u.length?days(u[0]):99,c=d<=0?"r":d<=3?"y":"";
+   return "<div class='ic "+c+"'><h3>"+i.name+"</h3><div class='big'>"+r2(avail(i.id))+" "+i.u+"</div>"+(bs.length?bs.map(b=>{const n=days(b);return "<div class='bt "+(n<=0?"r":n<=3?"y":"")+(locked(b)?" lock":"")+"'><span>"+b.id+" · "+b.q+" "+i.u+" · "+ZONES[b.z]+"</span><span>"+(locked(b)?"LOCKED ":"")+(n<0?"":n+"d")+" "+b.exp.slice(5)+(locked(b)?" <button class='btn sm mg' onclick=\"override('"+b.id+"')\">Override</button>":"")+"</span></div>"}).join(""):"<div class='mute'>Empty</div>")+"</div>"}).join("");
+  if(!skip)$("rb").innerHTML=items.map(i=>"<tr><td>"+i.name+"</td><td>"+i.u+"</td><td><input data-i='"+i.id+"' data-f='cost' type='number' min='0' value='"+i.cost+"' style='width:90px'></td><td><input data-i='"+i.id+"' data-f='loss' type='number' min='0' max='90' value='"+Math.round(i.loss*100)+"' style='width:70px'></td><td><input data-i='"+i.id+"' data-f='min' type='number' min='0' value='"+i.min+"' style='width:80px'></td></tr>").join("");
+  const w={};wasteLog.forEach(x=>w[x.t]=(w[x.t]||0)+x.v);
+  $("wr").innerHTML=Object.keys(w).length?Object.keys(w).map(k=>"<tr><td>"+k+"</td><td>₱"+Math.round(w[k]).toLocaleString()+"</td></tr>").join(""):"<tr><td class='mute'>No waste logged</td></tr>";
+  $("lb").innerHTML=log.length?log.slice(0,60).map(l=>"<tr><td>"+l.t+"</td><td>"+l.by+"</td><td>"+l.a+"</td><td>"+l.n+"</td><td>"+(l.d>0?"+":"")+r2(l.d)+"</td><td>"+l.note+"</td></tr>").join(""):"<tr><td colspan='6' class='mute'>No movements yet.</td></tr>"}
+const TABS=[["rec","Receive"],["fresh","Fresh intake"],["dash","Stock board"],["prep","Prep and waste"],["rcp","Recipes and costs","mg"],["log","History"]];
+$("tabs").innerHTML=TABS.map((t,i)=>"<button role='tab' data-t='"+t[0]+"' class='"+(t[2]||"")+"' aria-selected='"+(i===0)+"'>"+t[1]+"</button>").join("");
+$("tabs").onclick=e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.t;if(tab!=="rec")stopCam();
+  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  document.querySelectorAll("[data-v]").forEach(s=>s.classList.toggle("hide",s.dataset.v!==tab));render()};
+$("role").onchange=()=>{document.body.dataset.role=role();if(role()==="staff"&&tab==="rcp")$("tabs").firstChild.click();render()};
+render();
+</script></body></html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Passenger Seat Kitchen</title>
+<style>
+:root{--red:#C62828;--deep:#A61B1B;--acc:#E53935;--bg:#F8F8FA;--gray:#F1F2F4;--solid:#fff;--tx:#202124;--tx2:#6B7280;--bd:#E5E7EB;--ok:#15803D;--warn:#D97706;--err:#DC2626;--card:rgba(255,255,255,.88);--tint:rgba(198,40,40,.08);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17181b;--gray:#26282d;--solid:#1e2024;--tx:#f2f2f3;--tx2:#a1a6b0;--bd:#33363d;--card:rgba(30,32,36,.88);--tint:rgba(229,57,53,.18);--ok:#4ade80;--warn:#fbbf24;--err:#f87171}}
+:root[data-theme="dark"]{--bg:#17181b;--gray:#26282d;--solid:#1e2024;--tx:#f2f2f3;--tx2:#a1a6b0;--bd:#33363d;--card:rgba(30,32,36,.88);--tint:rgba(229,57,53,.18);--ok:#4ade80;--warn:#fbbf24;--err:#f87171}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*,*::before,*::after{box-sizing:border-box}html,body{margin:0}
+body{font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px;border-radius:8px}
+svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 20px;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--bd)}
+@supports not (backdrop-filter:blur(1px)){header,.card{background:var(--solid)}}
+.lg{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--deep));color:#fff;display:grid;place-items:center;flex:none}
+.ht{margin-right:auto;line-height:1.2}.ht b{font-size:17px;display:block}.ht small{color:var(--tx2)}
+.tabs{display:flex;gap:4px;background:var(--gray);padding:4px;border-radius:12px}
+.tabs button{border:0;background:none;min-height:44px;padding:0 16px;border-radius:9px;font-weight:600;color:var(--tx2);display:flex;gap:8px;align-items:center}
+.tabs button.on{background:var(--solid);color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.cnt{background:var(--red);color:#fff;border-radius:99px;font-size:12px;padding:0 7px;min-width:20px;text-align:center}
+.clk{font-variant-numeric:tabular-nums;font-weight:700;color:var(--tx2)}
+.me{display:flex;align-items:center;gap:10px}.av{width:38px;height:38px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--bd);background:var(--solid);font-weight:700;transition:background .2s,transform .2s,border-color .2s}
+.btn:hover:not(:disabled){transform:translateY(-1px);border-color:var(--red)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.p{background:var(--red);border-color:var(--red);color:#fff}.btn.p:hover:not(:disabled){background:var(--deep)}
+.theme-toggle{width:80px;height:42px;min-height:42px;padding:3px;gap:0;justify-content:flex-start;border-radius:999px;background:#eef0f3;border:1px solid #e2e5e9;box-shadow:none;flex:none;transition:background .2s,border-color .2s}
+.theme-toggle:hover:not(:disabled){transform:none;border-color:#e2e5e9;background:#eef0f3}
+.theme-knob{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:#C62828;color:#fff;transform:translateX(0);transition:transform .22s ease,background .22s}
+.theme-knob .i{width:19px;height:19px;stroke:#fff;stroke-width:2}
+.theme-toggle .moon{display:none}
+.theme-toggle[data-mode="dark"]{background:#343840;border-color:#454952;justify-content:flex-start}
+.theme-toggle[data-mode="dark"] .theme-knob{transform:translateX(36px)}
+.theme-toggle[data-mode="dark"] .sun{display:none}
+.theme-toggle[data-mode="dark"] .moon{display:block}
+@media(prefers-reduced-motion:reduce){.theme-knob{transition:none}}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}.btn.sm{min-height:40px;padding:0 12px;font-size:14px}.btn.ic{width:44px;padding:0;min-height:44px}
+.tick{display:flex;align-items:center;gap:12px;background:var(--err);color:#fff;padding:10px 20px;font-weight:600;flex-wrap:wrap}
+.tick[hidden]{display:none}.tick button{margin-left:auto;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;min-height:36px;padding:0 12px}
+.wrap{max-width:1360px;margin:auto;padding:16px 20px 40px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.bar .sp{margin-left:auto}
+.chip{min-height:44px;padding:0 16px;border-radius:99px;border:1px solid var(--bd);background:var(--solid);font-weight:600;color:var(--tx2)}.chip.on{background:var(--tint);border-color:var(--red);color:var(--red)}
+.note{background:var(--tint);color:var(--red);border-radius:10px;padding:8px 14px;font-size:13px;margin-bottom:16px}
+.cols{display:grid;grid-template-columns:repeat(var(--n,3),1fr);gap:16px;align-items:start}
+.col h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.col{background:var(--gray);border-radius:18px;padding:14px;min-height:200px}
+.oc{background:var(--solid);border:1px solid var(--bd);border-left:6px solid var(--ok);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 4px 16px rgba(90,20,20,.06)}
+.oc.y{border-left-color:var(--warn)}.oc.r{border-left-color:var(--err)}.oc.n{border-left-color:var(--tx2)}
+.oh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.tb{font-size:26px;line-height:1.1}.oh small{display:block;color:var(--tx2)}
+.ty{border:1px solid var(--bd);border-radius:99px;padding:0 10px;font-size:12px;font-weight:700;background:var(--gray)}
+.tr{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:var(--tx2);flex-wrap:wrap}
+.tm{display:inline-flex;gap:6px;align-items:center;font-weight:700;border:1px solid currentColor;border-radius:99px;padding:0 10px;color:var(--ok);font-variant-numeric:tabular-nums}
+.tm.y{color:var(--warn)}.tm.r{color:var(--err)}.tm.n{color:var(--tx2)}.tm i{font-style:normal;font-size:12px}
+.oc ul{list-style:none;margin:0 0 12px;padding:10px 0;border-top:1px dashed var(--bd);border-bottom:1px dashed var(--bd)}
+.oc li{display:flex;gap:8px;font-size:16px;padding:2px 0}.oc li b{min-width:34px;color:var(--red)}.oc li small{display:block;color:var(--err);font-weight:600;font-size:13px}
+.oc .btn{width:100%}.rd{text-align:center;color:var(--ok);font-weight:700;padding:10px;border:1px solid var(--ok);border-radius:12px}
+.empty{text-align:center;color:var(--tx2);padding:24px 8px;font-size:14px}
+.si{margin-bottom:10px}.nsp{font-size:13px;color:var(--tx2);margin-bottom:10px}
+.spb{background:var(--tint);border-left:4px solid var(--warn);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:15px}.spb.al{border-left-color:var(--err)}.spb b{color:var(--tx)}
+.tys{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.ty.fl{border-color:var(--red);color:var(--red);background:var(--tint)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:20px;box-shadow:0 8px 32px rgba(90,20,20,.06)}
+.card h2{margin:0 0 14px;font-size:17px}.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}.stack{display:grid;gap:16px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd)}.row:last-child{border:0}.row>div{flex:1;min-width:0}.row small{color:var(--tx2);display:block}
+.b{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:1px 10px;font-size:12px;font-weight:700;border:1px solid currentColor;white-space:nowrap}.b::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.b.ok{color:var(--ok)}.b.wn{color:var(--warn)}.b.er{color:var(--err)}
+.sw{width:56px;height:32px;border-radius:99px;border:0;background:var(--err);position:relative;transition:background .2s;flex:none}
+.sw[aria-checked="true"]{background:var(--ok)}.sw::after{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s}.sw[aria-checked="true"]::after{transform:translateX(24px)}
+label{display:block;font-size:13px;font-weight:600;color:var(--tx2);margin:12px 0 4px}
+input,select{width:100%;min-height:48px;border:1px solid var(--bd);border-radius:10px;padding:0 12px;background:var(--solid)}input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--tint);outline:0}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}.seg .chip{border-radius:12px}
+.er{color:var(--err);font-size:13px;min-height:18px;margin-top:4px}
+.toast{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:12px 18px;border-radius:12px;transform:translateY(20px);opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:calc(100vw - 40px)}.toast.on{opacity:1;transform:none}
+.gw{grid-template-columns:2fr 1fr}
+.wf{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 12px}.wf>div{margin-bottom:12px}.wf label{margin:0 0 4px}
+.qw{display:flex;gap:6px}.qw input{flex:1;min-width:0}.qw select{width:auto;max-width:150px;flex:none;padding:0 6px}
+.modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}.modal[hidden]{display:none}.mbox{background:var(--solid);border:1px solid var(--bd);border-radius:18px;padding:20px;width:min(440px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35)}.mbox h2{margin:0 0 4px;font-size:17px}.mbox p{margin:0 0 8px;color:var(--tx2);font-size:14px}.mbox .bar{margin:14px 0 0;justify-content:flex-end}.linkb{background:none;border:0;color:var(--red);font-weight:700;padding:0 0 0 6px;text-decoration:underline;font-size:12px}
+.hint{display:block;font-size:12px;color:var(--tx2);margin-top:4px}
+.prev{background:var(--tint);border-left:4px solid var(--red);border-radius:10px;padding:10px 12px;margin:4px 0 12px;font-size:14px}.prev b{color:var(--red)}.prev.need{border-left-color:var(--warn)}
+.lh{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}.lh h2{margin:0}.lh select{width:auto;min-width:170px}
+.tw{overflow-x:auto}.tw table{width:100%;border-collapse:collapse;font-size:14px;min-width:700px}.tw th{text-align:left;font-size:12px;color:var(--tx2);padding:8px 10px;background:var(--gray);white-space:nowrap}.tw th:first-child{border-radius:10px 0 0 10px}.tw th:last-child{border-radius:0 10px 10px 0}
+.tw td{padding:10px;border-bottom:1px solid var(--bd);vertical-align:top}.tw td small{display:block;color:var(--tx2)}.tw .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.tw tfoot td{border:0;font-weight:700}
+.lb{display:grid;grid-template-columns:minmax(100px,150px) 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:14px}.lb .trk{height:14px;background:var(--gray);border-radius:99px;overflow:hidden}.lb .fill{height:100%;min-width:4px;background:linear-gradient(90deg,var(--acc),var(--deep));border-radius:99px;transition:width .3s}.lb .v{font-variant-numeric:tabular-nums;font-weight:700}
+.sub{font-size:12px;color:var(--tx2);margin:-8px 0 10px}
+@media(max-width:1000px){.cols{grid-template-columns:1fr!important}.g2,.gw{grid-template-columns:1fr}}
+@media(max-width:600px){header{padding:10px 12px}.wrap{padding:12px}.me span{display:none}.tabs{width:100%}.tabs button{flex:1;justify-content:center}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+
+/* Remove decorative shadows across the interface while keeping focus and scanner overlays visible. */
+*:not(.admin-scanner-corners) { box-shadow: none !important; text-shadow: none !important; }
+*:focus-visible { outline: 2px solid var(--red, currentColor) !important; outline-offset: 2px !important; }
+</style></head>
+<body>
+<header>
+ <div class="lg"><svg class="i" viewBox="0 0 24 24"><path d="M6 13.9V20h12v-6.1M4 11a4 4 0 0 1 4-4 4 4 0 0 1 8 0 4 4 0 0 1 4 4z"/></svg></div>
+ <div class="ht"><b>Kitchen</b><small>Passenger Seat</small></div>
+ <div class="tabs" role="tablist"><button role="tab" class="on" data-v="orders" aria-selected="true">Orders <span class="cnt" id="c-o">0</span></button><button role="tab" data-v="inv" aria-selected="false">Inventory <span class="cnt" id="c-i">0</span></button><button role="tab" data-v="waste" aria-selected="false">Food waste <span class="cnt" id="c-w">0</span></button></div>
+ <span class="clk" id="clk"></span>
+ <button class="theme-toggle" id="theme" type="button" role="switch" aria-checked="false" aria-label="Switch to dark mode" title="Switch to dark mode" data-mode="light"><span class="theme-knob"><svg class="i sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg><svg class="i moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span></button>
+ <div class="me"><div class="av">KS</div><span><b>Kitchen Staff</b></span><button class="btn ic" id="out" aria-label="Log out"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button></div>
+</header>
+<div class="tick" id="tick" hidden role="alert"><svg class="i" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span id="tt"></span><button data-v="inv">Open stock</button></div>
+<div class="wrap">
+ <section id="v-orders">
+  <div class="note">Sample orders for layout. When a customer sends a new order to the kitchen, recipe ingredients are deducted from stock automatically.</div>
+  <div class="bar" id="flt"></div>
+  <div class="cols" id="cols"></div>
+ </section>
+ <section id="v-inv" hidden>
+  <div class="g2">
+   <div class="stack">
+    <div class="card"><h2>Ingredient stock</h2><div id="stock"></div></div>
+    <div class="card"><h2>Automatic stock deduction</h2><p style="margin:0 0 12px;color:var(--tx2);font-size:14px">When a customer sends an order to the kitchen, the system deducts every configured item recipe from stock automatically. No manual deduction is needed.</p><div class="bar"><button class="btn p" data-a="pay">Simulate customer order sent to kitchen</button><button class="btn" data-a="restock">Simulate delivery received</button></div><div id="rcp"></div></div>
+   </div>
+   <div class="stack">
+    <div class="card"><h2>Menu availability (automatic)</h2><p style="margin:0 0 8px;color:var(--tx2);font-size:14px">An item shows Not available on the public menu as soon as any ingredient in its recipe runs out.</p><div id="mn"></div></div>
+    <div class="card"><h2>Inventory log (automatic)</h2><div id="logs"></div></div>
+   </div>
+  </div>
+ </section>
+ <section id="v-waste" hidden>
+  <div class="note">Logging waste instantly deducts the quantity from inventory stock and updates the loss chart.</div>
+  <div class="g2 gw">
+   <div class="stack">
+    <div class="card"><h2>Log waste</h2>
+     <div class="wf">
+      <div><label for="w-item">Item</label><select id="w-item"></select></div>
+      <div><label for="w-qty">Qty</label><div class="qw"><input id="w-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"><select id="w-unit" aria-label="Unit of measurement"></select></div><span class="hint" id="w-av"></span></div>
+      <div><label for="w-stage">Stage</label><select id="w-stage"></select></div>
+      <div><label for="w-reason">Reason</label><select id="w-reason"></select><span class="hint" id="w-oth"></span></div>
+      <div><label for="w-by">Logged by</label><select id="w-by"></select></div>
+     </div>
+     <div class="prev" id="w-prev" aria-live="polite"></div>
+     <div class="er" id="w-err" role="alert"></div>
+     <button class="btn p" data-a="waste">Log waste</button>
+    </div>
+    <div class="card">
+     <div class="lh"><h2>Waste log</h2><div><label for="w-range" style="position:absolute;left:-9999px">Date range</label><select id="w-range"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="week">This week</option><option value="month">This month</option><option value="all">All time</option></select></div></div>
+     <div class="tw"><table><thead><tr><th>Time</th><th>Item</th><th class="num">Qty</th><th>Stage</th><th>Reason</th><th>Logged by</th><th class="num">Cost lost</th></tr></thead><tbody id="w-rows"></tbody><tfoot id="w-foot"></tfoot></table></div>
+    </div>
+   </div>
+   <div class="stack">
+    <div class="card"><h2>Loss by stage</h2><p class="sub" id="w-sub"></p><div id="w-chart"></div></div>
+    <div class="card"><h2>Near expiry</h2><div id="w-exp"></div></div>
+   </div>
+  </div>
+ </section>
+</div>
+<div class="modal" id="w-modal" hidden><div class="mbox" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Other reason</h2><p>Please type the specific reason for this waste.</p><label for="m-in" style="margin-top:4px">Specific reason</label><input id="m-in" maxlength="80" autocomplete="off" placeholder="e.g. Fridge power outage"><div class="er" id="m-err" role="alert"></div><div class="bar"><button class="btn" data-a="ocancel" type="button">Cancel</button><button class="btn p" data-a="osave" type="button">Save reason</button></div></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+const $=s=>document.querySelector(s),M=60000,N=()=>Date.now();
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("on"),2600)}
+const SP={"PS-0107":"Allergy alert: guest is allergic to shellfish. Please use clean utensils and serve rice with the chicken.","PS-0108":"Birthday celebration. Please bring the dish out together at the table.","PS-0109":"Pack the iced tea in a separate bag and add extra calamansi on the side.","PS-0103":"Halo-halo: less sugar, please."};
+let O=[["PS-0107","5","Dine-in",[[2,"Chicken Inasal","Extra rice"],[1,"Sinigang na Baboy",""]],14.2,"Pending"],["PS-0108","2","Dine-in",[[1,"Boodle Fight for 4","No onions"]],6.1,"Pending"],["PS-0109","","Take-out",[[3,"Lumpiang Shanghai",""],[1,"Iced Tea","No ice"]],9.3,"Pending"],["PS-0104","7","Dine-in",[[1,"Kare-Kare",""],[2,"Plain Rice",""]],12,"Preparing"],["PS-0103","3","Dine-in",[[2,"Halo-halo",""],[1,"Leche Flan",""]],4,"Preparing"],["PS-0102","","Take-out",[[2,"Sisig","Well-done"]],17,"Ready"]].map(o=>({id:o[0],tb:o[1],ty:o[2],it:o[3],t:N()-o[4]*M,st:o[5],sp:SP[o[0]]||"",x:false,rt:o[5]=="Ready"?N()-3*M:0}));
+let I=[["Chicken",1.5,10,"kg",175,1],["Pork belly",6,8,"kg",320,2],["Plain rice",60,20,"kg",55,180],["Cooking oil",1.2,5,"L",110,90],["Calamansi",0.5,3,"kg",90,4],["Lumpia wrapper",40,50,"pcs",3,30],["Tomatoes",9,3,"kg",80,0],["Coconut milk",24,12,"can",65,120],["Bihon noodles",10,5,"pack",45,200]].map((x,i)=>({id:i,n:x[0],s:x[1],m:x[2],u:x[3],c:x[4],e:x[5]}));
+const RC=[["Chicken Inasal",[[0,.3],[2,.15],[4,.02]]],["Sinigang na Baboy",[[1,.25],[2,.15]]],["Sisig",[[1,.2],[3,.05]]],["Crispy Pata",[[1,1.2],[3,.5]]],["Lumpiang Shanghai",[[5,5],[3,.05]]]];
+const miss=r=>r[1].filter(([k,q])=>I[k].s<q).map(([k])=>I[k].n);
+let L=[],flt="All",act="Deduct",nid=110;
+const stat=i=>i.s<=0?["er","Out of stock"]:i.s<i.m?["wn","Low stock"]:["ok","In stock"];
+const fm=ms=>{const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")};
+const lv=ms=>ms<8*M?["","On time"]:ms<15*M?["y","Slow"]:["r","Late"];
+const clock=t=>new Date(t).toLocaleTimeString("en-PH",{hour:"numeric",minute:"2-digit"});
+function tm(o){if(o.st==="Ready"||o.st==="Served"){const elapsed=Math.max(0,((o.st==="Served"?o.ct:N())||N())-(o.rt||o.t));return`<span class="tm n"><b>${fm(elapsed)}</b><i>${o.st==="Served"?"Pickup / service timer stopped":"Waiting for pickup / service"}</i></span>`}const l=lv(N()-o.t);return`<span class="tm ${l[0]}"><b>${fm(N()-o.t)}</b><i>${l[1]}</i></span>`}
+const al=s=>/allerg/i.test(s);
+function spi(o){if(!o.sp)return`<div class="nsp">No special instructions</div>`;const a=al(o.sp);return`<button class="btn sm si" data-a="si" data-id="${o.id}" aria-expanded="${o.x}">${o.x?"Hide":"View"} special instructions</button>${o.x?`<div class="spb ${a?'al':''}" role="note"><b>${a?"Allergy alert":"Special instructions"}</b><br>${o.sp}</div>`:""}`}
+function card(o){const c=(o.st==="Ready"||o.st==="Served")?"n":lv(N()-o.t)[0];
+return`<article class="oc ${c}" data-id="${o.id}"><div class="oh"><div><b class="tb">${o.tb?"Table "+o.tb:"Take-out"}</b><small>${o.id}</small></div><span class="tys"><span class="ty">${o.ty}</span>${o.sp?`<span class="ty fl">${al(o.sp)?"Allergy":"Note"}</span>`:""}</span></div>
+<div class="tr"><span>Placed ${clock(o.t)}</span><span class="tmw">${tm(o)}</span></div>
+<ul>${o.it.map(i=>`<li><b>${i[0]}x</b><span>${i[1]}${i[2]?`<small>${i[2]}</small>`:""}</span></li>`).join("")}</ul>
+${spi(o)}
+${o.st==="Pending"?`<button class="btn p" data-a="start" data-id="${o.id}">Accept / Start Cooking</button>`:o.st==="Preparing"?`<button class="btn ok" data-a="ready" data-id="${o.id}">Mark as Ready</button>`:o.st==="Ready"?`<button class="btn ok" data-a="served" data-id="${o.id}">Picked Up / Served</button>`:`<div class="rd">✓ Picked Up / Served</div>`}</article>`}
+function orders(){const S=["Pending","Preparing","Ready","Served"],sh=flt=="All"?S:[flt];
+$("#flt").innerHTML=["All",...S].map(f=>`<button class="chip ${f==flt?'on':''}" data-f="${f}" aria-pressed="${f==flt}">${f}${f=="All"?"":" ("+O.filter(o=>o.st==f).length+")"}</button>`).join("")+`<button class="btn sm sp" data-a="sim">Simulate customer order</button>`;
+$("#cols").style.setProperty("--n",sh.length);
+$("#cols").innerHTML=sh.map(s=>{const l=O.filter(o=>o.st==s).sort((a,b)=>a.t-b.t);return`<div class="col"><h2>${s} <span class="cnt">${l.length}</span></h2>${l.length?l.map(card).join(""):`<div class="empty">No ${s.toLowerCase()} orders</div>`}</div>`}).join("");
+$("#c-o").textContent=O.filter(o=>o.st=="Pending").length}
+function inv(){const low=I.filter(i=>i.s<i.m);
+$("#c-i").textContent=low.length;$("#tick").hidden=!low.length;
+$("#tt").textContent="Warning: "+low.map(i=>`${i.n} ${i.s<=0?"out of stock":"running low"} (${i.s} ${i.u}, min ${i.m})`).join(" · ");
+$("#stock").innerHTML=I.map(i=>{const s=stat(i);return`<div class="row"><div><b>${i.n}</b><small>${i.s} ${i.u} · minimum ${i.m} ${i.u}</small></div><span class="b ${s[0]}">${s[1]}</span></div>`}).join("");
+$("#rcp").innerHTML=RC.map(r=>`<div class="row"><div><b>${r[0]}</b><small>Per serving: ${r[1].map(([k,q])=>q+" "+I[k].u+" "+I[k].n).join(" · ")}</small></div></div>`).join("");
+$("#mn").innerHTML=RC.map(r=>{const m=miss(r);return`<div class="row"><div><b>${r[0]}</b><small>${m.length?"Out of stock: "+m.join(", "):"All ingredients in stock"}</small></div><span class="b ${m.length?'er':'ok'}">${m.length?"Not available":"Available"}</span></div>`}).join("");
+$("#logs").innerHTML=L.length?L.slice(0,8).map(l=>`<div class="row"><div><b>${l.a} ${l.q} ${l.u} · ${l.n}</b><small>${clock(l.t)} · ${l.by||"System"} · ${l.note}</small></div></div>`).join(""):`<div class="empty">No automatic entries yet. A new customer order sent to the kitchen will create a stock deduction log.</div>`}
+function view(v){$("#v-orders").hidden=v!="orders";$("#v-inv").hidden=v!="inv";$("#v-waste").hidden=v!="waste";if(v=="waste")waste();document.querySelectorAll(".tabs button").forEach(b=>{const on=b.dataset.v==v;b.classList.toggle("on",on);b.setAttribute("aria-selected",on)});scrollTo(0,0)}
+document.addEventListener("click",e=>{const el=e.target.closest("button");if(!el)return;const d=el.dataset;
+if(d.v)return view(d.v);if(d.f){flt=d.f;return orders()}
+if(d.a==="start"||d.a==="ready"||d.a==="served"){const o=O.find(x=>x.id===d.id);if(!o)return;if(d.a==="start"){o.st="Preparing";toast(o.id+" is now preparing")}else if(d.a==="ready"){o.st="Ready";o.rt=N();toast(o.id+" ready. Service staff notified.")}else{o.st="Served";o.ct=N();toast(o.id+" picked up / served. Waiting timer stopped.")}return orders()}
+if(d.a=="si"){const o=O.find(x=>x.id==d.id);o.x=!o.x;orders();const b=document.querySelector('[data-a="si"][data-id="'+d.id+'"]');if(b)b.focus();return}
+if(d.a==="sim"||d.a==="pay")return sendCustomerOrderToKitchen();
+if(d.a=="restock")return restock();
+if(d.a=="waste")return logWaste();
+if(d.a=="osave")return saveOther();
+if(d.a=="ocancel")return cancelOther();
+if(d.a=="oedit")return openOther();
+if(d.a=="pre"){$("#w-item").value=d.k;wItem();$("#w-qty").focus();return}
+
+
+if(el.id==="out")toast("Signed out (demo)");
+if(el.id==="theme"){const r=document.documentElement;setTheme(r.dataset.theme==="dark"?"light":"dark",true)}});
+const avail=()=>RC.filter(r=>!miss(r).length).map(r=>r[0]);
+function deductRecipeForKitchen(order){
+ if(order.stockDeducted)return {ok:true,already:true};
+ const required={};
+ for(const line of order.it){
+  const qty=Number(line[0])||0, name=String(line[1]||"");
+  const recipe=RC.find(r=>r[0].toLowerCase()===name.toLowerCase());
+  if(!recipe)return {ok:false,reason:"Recipe not configured for "+name};
+  for(const [k,q] of recipe[1])required[k]=(required[k]||0)+q*qty;
+ }
+ const shortages=Object.entries(required).filter(([k,q])=>I[Number(k)].s+1e-9<q).map(([k,q])=>`${I[Number(k)].n} (need ${Math.round(q*100)/100} ${I[Number(k)].u}, available ${I[Number(k)].s} ${I[Number(k)].u})`);
+ if(shortages.length)return {ok:false,reason:"Insufficient stock: "+shortages.join(", ")};
+ const before=avail();
+ for(const [key,amount] of Object.entries(required)){
+  const k=Number(key),q=Math.round(amount*100)/100;
+  I[k].s=Math.round((I[k].s-q)*100)/100;
+  L.unshift({a:"Auto-deduct",q,u:I[k].u,n:I[k].n,t:N(),note:order.id+" sent to kitchen"});
+ }
+ order.stockDeducted=true;
+ const gone=before.filter(x=>!avail().includes(x));
+ return {ok:true,gone};
+}
+function sendCustomerOrderToKitchen(){
+ const ok=RC.filter(r=>!miss(r).length);
+ if(!ok.length){toast("No menu item has enough stock to send to the kitchen");return}
+ const r=ok[Math.floor(Math.random()*ok.length)];
+ const mx=Math.min(...r[1].map(([k,q])=>Math.floor((I[k].s+1e-9)/q)));
+ const n=Math.max(1,Math.min(1+Math.floor(Math.random()*3),mx));
+ const id="PS-0"+(nid++),tb=Math.random()<.3?"":String(1+Math.floor(Math.random()*9));
+ const order={id,tb,ty:tb?"Dine-in":"Take-out",it:[[n,r[0],""]],t:N(),st:"Pending",rt:0,ct:0,x:false,sp:Math.random()<.5?["Please serve with extra rice.","Allergy alert: no peanuts.","Pack utensils for take-out."][Math.floor(Math.random()*3)]:"",stockDeducted:false};
+ const result=deductRecipeForKitchen(order);
+ if(!result.ok){inv();toast("Order not sent to kitchen. "+result.reason);return}
+ O.push(order);
+ orders();inv();
+ toast(result.gone&&result.gone.length?"Order sent to kitchen. Stock deducted automatically; now unavailable: "+result.gone.join(", "):id+" sent to kitchen. Recipe ingredients deducted automatically.");
+}
+function restock(){let c=0;I.forEach(i=>{if(i.s<i.m){const q=i.m*2;i.s=Math.round((i.s+q)*100)/100;L.unshift({a:"Auto-receive",q,u:i.u,n:i.n,t:N(),note:"Barcode receiving confirmed"});c++}});if(!c){toast("Nothing to restock");return}inv();toast("Delivery received. Menu availability updated automatically.")}
+setInterval(()=>{document.querySelectorAll(".oc").forEach(c=>{const o=O.find(x=>x.id==c.dataset.id);if(!o)return;c.querySelector(".tmw").innerHTML=tm(o);c.className="oc "+((o.st==="Ready"||o.st==="Served")?"n":lv(N()-o.t)[0])});$("#clk").textContent=new Date().toLocaleTimeString("en-PH",{hour:"numeric",minute:"2-digit",second:"2-digit"})},1000);
+function setTheme(theme,persist=true){
+ const value=theme==="dark"?"dark":"light";
+ document.documentElement.dataset.theme=value;
+ if(persist){try{localStorage.setItem("ps_kitchen_theme",value)}catch(e){}}
+ const next=value==="dark"?"light":"dark";
+ const label="Switch to "+next+" mode";
+ const b=$("#theme");if(b){b.setAttribute("aria-label",label);b.title=label;b.setAttribute("aria-checked",String(value==="dark"));b.dataset.mode=value}
+}
+let initialTheme="light";
+try{initialTheme=localStorage.getItem("ps_kitchen_theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}
+setTheme(initialTheme,false);
+orders();inv();
+/* ===== Food waste monitoring ===== */
+const STG=["Pre-consumer spoilage","Storage / receiving","Preparation / trimming","Cooking / production","Plate waste (returned)"],OTH="Others, please type",RSN=["Expired","Spoiled","Dropped / spilled","Overcooked / burnt","Wrong order","Customer returned","Overproduction",OTH],STAFF=["Kitchen Staff","Chef Dado","Cook Mia","Cook Jun"],RNG={today:"Today",yesterday:"Yesterday",week:"This week",month:"This month",all:"All time"};
+const sod=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime()},DAY=864e5,H=36e5;
+const peso=n=>"₱"+Number(n).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2}),r2=n=>Math.round(n*100)/100;
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let W=[[-1,16,1,.8,"Plate waste (returned)","Customer returned","Cook Mia"],[-3,10,1,1.2,"Pre-consumer spoilage","Spoiled","Chef Dado"],[-3,18,6,3,"Cooking / production","Overcooked / burnt","Cook Jun"],[-12,9,2,2,"Storage / receiving","Expired","Chef Dado"]].map(x=>{const it=I[x[2]];return{t:sod()+x[0]*DAY+x[1]*H,id:it.id,n:it.n,q:x[3],u:it.u,st:x[4],rs:x[5],cost:r2(x[3]*it.c),by:x[6]}});
+let wr="today";
+function inRange(t,f){const a=sod();if(f=="today")return t>=a;if(f=="yesterday")return t>=a-DAY&&t<a;if(f=="week"){const d=new Date();const off=(d.getDay()+6)%7;return t>=a-off*DAY}if(f=="month"){const d=new Date();return t>=new Date(d.getFullYear(),d.getMonth(),1).getTime()}return true}
+const stamp=t=>{const d=new Date(t),a=sod();return(t>=a?"Today":t>=a-DAY?"Yesterday":d.toLocaleDateString("en-PH",{month:"short",day:"numeric"}))+", "+clock(t)};
+const isoDay=n=>{const d=new Date(sod()+n*DAY);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const UL={kg:"kg (Kilograms)",g:"g (Grams)",L:"L (Liters)",mL:"mL (Milliliters)",pcs:"pcs (Pieces)",pack:"pack / bag",can:"can"},FAC={g:.001,mL:.001},FAM={kg:["kg","g"],g:["kg","g"],L:["L","mL"],mL:["L","mL"]},COUNT=["pcs","pack","can"];
+const r3=n=>Math.round(n*1000)/1000,ulab=u=>u=="pack"?"pack/bag":u;
+let prevRs="Expired",other="";
+function wInit(){const o=a=>a.map(x=>`<option>${x}</option>`).join("");
+ $("#w-item").innerHTML=I.map(i=>`<option value="${i.id}">${esc(i.n)}</option>`).join("");
+ $("#w-stage").innerHTML=o(STG);$("#w-reason").innerHTML=o(RSN);
+ $("#w-by").innerHTML='<option value="">Select staff</option>'+o(STAFF);wItem()}
+function wItem(){const i=I[+$("#w-item").value],ok=FAM[i.u]||[i.u];
+ $("#w-unit").innerHTML=Object.keys(UL).map(u=>`<option value="${u}"${ok.includes(u)?"":" disabled"}${u==i.u?" selected":""}>${UL[u]}</option>`).join("");
+ wUnit()}
+function wUnit(){const i=I[+$("#w-item").value],u=$("#w-unit").value;$("#w-qty").step=COUNT.includes(u)?"1":"0.01";
+ $("#w-av").textContent="On hand: "+i.s+" "+ulab(i.u)+" · "+peso(i.c)+" per "+ulab(i.u);wPrev()}
+function wCalc(){const i=I[+$("#w-item").value],u=$("#w-unit").value,q=parseFloat($("#w-qty").value);return{i,u,q,bq:r3(q*(FAC[u]||1))}}
+function wPrev(){const{i,u,q,bq}=wCalc(),p=$("#w-prev");
+ if(!(q>0)){p.className="prev";p.innerHTML="Enter a quantity to see the cost of this loss.";return}
+ const c=r2(bq*i.c);p.className="prev";
+ p.innerHTML=`Logging <b>${q} ${ulab(u)}</b> of <b>${esc(i.n)}</b>${u!=i.u?` (${bq} ${i.u})`:""} will cost <b>${peso(c)}</b>.`+(bq>i.s+1e-9?` <b>Only ${i.s} ${ulab(i.u)} on hand.</b>`:"")}
+function logWaste(){const{i,u,q,bq}=wCalc(),by=$("#w-by").value,E=$("#w-err"),bad=m=>{E.textContent=m};
+ if(!(q>0))return bad("Enter a quantity greater than zero.");
+ if(COUNT.includes(u)&&!Number.isInteger(q))return bad("Whole numbers only for "+ulab(u)+".");
+ if(bq>i.s+1e-9)return bad("Only "+i.s+" "+ulab(i.u)+" of "+i.n+" on hand. You can't log more than the current stock.");
+ const rv=$("#w-reason").value;if(rv==OTH&&!other)return bad("Type the specific reason for \"Others\".");
+ if(!by)return bad("Select who is logging this waste.");
+ bad("");const cost=r2(bq*i.c),before=avail(),stg=$("#w-stage").value,rs=rv==OTH?"Others: "+other:rv,t=N();
+ i.s=r3(i.s-bq);
+ W.unshift({t,id:i.id,n:i.n,q,u:ulab(u),st:stg,rs,cost,by});
+ L.unshift({a:"Waste-out",q:bq,u:i.u,n:i.n,t,by,note:rs+" ("+stg+")"});
+ const gone=before.filter(x=>!avail().includes(x));
+ $("#w-qty").value="";
+ if(wr=="yesterday"){wr="today";$("#w-range").value="today"}
+ inv();waste();wItem();
+ toast(q+" "+ulab(u)+" "+i.n+" logged ("+peso(cost)+"). Stock updated"+(gone.length?"; now unavailable: "+gone.join(", "):"")+".")}
+function othHint(){const h=$("#w-oth");h.innerHTML=$("#w-reason").value==OTH&&other?`Reason: ${esc(other)}<button class="linkb" data-a="oedit" type="button">Edit</button>`:""}
+function openOther(){$("#m-in").value=other;$("#m-err").textContent="";$("#w-modal").hidden=false;$("#m-in").focus()}
+function closeOther(){$("#w-modal").hidden=true;$("#w-reason").focus()}
+function saveOther(){const v=$("#m-in").value.trim();if(!v){$("#m-err").textContent="Please type a reason.";return}other=v;closeOther();othHint();$("#w-err").textContent=""}
+function cancelOther(){if(!other){$("#w-reason").value=prevRs}closeOther();othHint()}
+function waste(){
+ const f=W.filter(w=>inRange(w.t,wr)),tot=r2(f.reduce((a,w)=>a+w.cost,0));
+ $("#w-rows").innerHTML=f.length?f.map(w=>`<tr><td>${stamp(w.t)}</td><td>${esc(w.n)}</td><td class="num">${w.q} ${w.u}</td><td>${esc(w.st)}</td><td>${esc(w.rs)}</td><td>${esc(w.by)}</td><td class="num">${peso(w.cost)}</td></tr>`).join(""):`<tr><td colspan="7"><div class="empty">No waste logged for this period.</div></td></tr>`;
+ $("#w-foot").innerHTML=f.length?`<tr><td colspan="6">${f.length} ${f.length>1?"entries":"entry"} · ${RNG[wr]}</td><td class="num">${peso(tot)}</td></tr>`:"";
+ const by={};f.forEach(w=>by[w.st]=(by[w.st]||0)+w.cost);const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]),mx=rows.length?rows[0][1]:1;
+ $("#w-sub").textContent="Y: waste stage · X: cost lost (₱) · "+RNG[wr];
+ $("#w-chart").innerHTML=rows.length?rows.map(([k,v])=>`<div class="lb"><span>${esc(k)}</span><div class="trk" role="img" aria-label="${esc(k)} ${peso(v)}"><div class="fill" style="width:${Math.max(3,v/mx*100)}%"></div></div><span class="v">${peso(v)}</span></div>`).join(""):'<div class="empty">No data.</div>';
+ const ex=I.filter(i=>i.s>0&&i.e<=2).sort((a,b)=>a.e-b.e);
+ $("#w-exp").innerHTML=ex.length?ex.map(i=>{const c=i.e<0?"er":i.e==0?"er":"wn",lab=i.e<0?"Expired":i.e==0?"Today":i.e==1?"Tomorrow":"In "+i.e+" days";
+  return`<div class="row"><div><b>${esc(i.n)}: ${i.s} ${i.u}</b><small>${isoDay(i.e)} · ${peso(r2(i.s*i.c))} at risk · consider a chef's special</small></div><span class="b ${c}">${lab}</span><button class="btn sm" data-a="pre" data-k="${i.id}">Log</button></div>`}).join(""):'<div class="empty">Nothing close to expiry.</div>';
+ $("#c-w").textContent=ex.length;$("#c-w").hidden=!ex.length}
+document.addEventListener("input",e=>{if(e.target.id=="w-qty"){$("#w-err").textContent="";wPrev()}});
+document.addEventListener("keydown",e=>{if($("#w-modal").hidden)return;if(e.key=="Escape")cancelOther();if(e.key=="Enter"&&e.target.id=="m-in"){e.preventDefault();saveOther()}});
+document.addEventListener("click",e=>{if(e.target.id=="w-modal")cancelOther()});
+document.addEventListener("change",e=>{if(e.target.id=="w-item"){$("#w-err").textContent="";wItem()}if(e.target.id=="w-unit"){$("#w-err").textContent="";wUnit()}if(e.target.id=="w-reason"){$("#w-err").textContent="";if(e.target.value==OTH)openOther();else{prevRs=e.target.value;othHint()}}if(e.target.id=="w-range"){wr=e.target.value;waste()}});
+wInit();waste();
+</script></body></html>
