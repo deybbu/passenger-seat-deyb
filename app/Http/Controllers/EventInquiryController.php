@@ -6,9 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Models\EventInquiry;
 use App\Models\EventBlackoutDate;
+use App\Models\EventDateHold;
 use App\Models\EventPackage;
 use App\Models\SystemSetting;
 use App\Services\EventAvailabilityService;
+use App\Services\EventInquiryMailService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -56,7 +58,7 @@ class EventInquiryController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse|JsonResponse
+    public function store(Request $request, EventInquiryMailService $inquiryMail): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'event_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
@@ -130,9 +132,15 @@ class EventInquiryController extends Controller
                 || EventInquiry::query()
                 ->where('event_date', '>=', $validated['event_date'])
                 ->where('event_date', '<', $dayAfterEvent)
-                ->whereIn('status', EventInquiry::BLOCKING_STATUSES)
+                ->whereIn('status', array_diff(EventInquiry::BLOCKING_STATUSES, ['proposal_sent_on_hold', 'proposal_accepted', 'deposit_submitted']))
                 ->lockForUpdate()
-                ->first(['id']) !== null;
+                ->first(['id']) !== null
+                || EventDateHold::query()->whereDate('event_date', $validated['event_date'])
+                    ->where(function ($query): void {
+                        $query->where('status', 'booked')->orWhere(function ($active): void {
+                            $active->where('status', 'held')->where('expires_at', '>', now());
+                        });
+                    })->lockForUpdate()->exists();
 
             if ($dateIsBlocked) {
                 return null;
@@ -167,9 +175,12 @@ class EventInquiryController extends Controller
                 ->withInput();
         }
 
+        $inquiryMailLog = $inquiryMail->sendAcknowledgement($inquiry);
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
+                'email_status' => $inquiryMailLog->status,
                 'inquiry' => [
                     'reference' => $inquiry->reference,
                     'event_date' => $inquiry->event_date->toDateString(),

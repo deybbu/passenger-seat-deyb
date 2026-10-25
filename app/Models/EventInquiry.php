@@ -7,12 +7,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EventInquiry extends Model
 {
     public const STATUS_PENDING = 'pending';
 
-    public const BLOCKING_STATUSES = ['pending', 'under_review', 'approved', 'confirmed', 'booked'];
+    public const BLOCKING_STATUSES = ['pending', 'under_review', 'proposal_sent_on_hold', 'proposal_accepted', 'deposit_submitted', 'approved', 'confirmed', 'booked'];
 
     public const BOOKED_STATUSES = ['approved', 'confirmed', 'booked'];
 
@@ -83,5 +84,20 @@ class EventInquiry extends Model
     public function internalNotes(): HasMany
     {
         return $this->hasMany(EventInquiryNote::class);
+    }
+
+    public function proposals(): HasMany
+    {
+        return $this->hasMany(EventProposal::class);
+    }
+
+    public function dateHolds(): HasMany
+    {
+        return $this->hasMany(EventDateHold::class);
+    }
+
+    public function latestProposal(): HasOne
+    {
+        return $this->hasOne(EventProposal::class)->whereNull('superseded_at')->latestOfMany();
     }
 }
