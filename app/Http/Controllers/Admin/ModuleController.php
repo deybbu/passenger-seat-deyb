@@ -12,8 +12,6 @@ use App\Models\AdminAlertRule;
 use App\Models\ChatbotKnowledgeSource;
 use App\Models\EventBlackoutDate;
 use App\Models\EventInquiry;
-use App\Models\EventProposal;
-use App\Models\EventEmailLog;
 use App\Models\EventPackage;
 use App\Models\Faq;
 use App\Models\MenuCategory;
@@ -28,10 +26,7 @@ use App\Models\SystemSetting;
 use App\Models\UnansweredQuestion;
 use App\Models\User;
 use App\Services\InventoryService;
-use App\Services\EventDateHoldService;
-use App\Services\EventQuoteCalculator;
 use App\Support\AdminSettings;
-use App\Support\EventPaymentSettings;
 use App\Support\InventoryTaxonomy;
 use App\Support\MenuImageUrl;
 use Carbon\Carbon;
@@ -55,66 +50,46 @@ class ModuleController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'under_review', 'approved', 'declined'])],
-            'event_package_id' => ['sometimes', 'nullable', 'integer', Rule::exists('event_packages', 'id')->where('is_active', true)],
         ]);
-        if ($validated['status'] === 'approved') {
-            return response()->json(['message' => 'Verify the customer deposit before confirming this booking.', 'errors' => ['status' => ['Verify the customer deposit before confirming this booking.']]], 422);
-        }
-        if ($validated['status'] === 'declined') app(EventDateHoldService::class)->release($reservation, 'Inquiry declined by staff');
-        if (! empty($validated['event_package_id'])) {
-            $package = EventPackage::query()->findOrFail($validated['event_package_id']);
-            abort_unless($package->supportsGuestCount((int) $reservation->guest_count), 422, 'Choose a package that covers the number of guests.');
+        if ($validated['status'] === 'approved'
+            && EventBlackoutDate::query()->whereDate('date', $reservation->event_date)->exists()) {
+            return response()->json([
+                'message' => 'This event date is blocked and cannot be approved.',
+                'errors' => ['status' => ['This event date is blocked and cannot be approved.']],
+            ], 422);
         }
         $reservation->update($validated);
         return response()->json(['ok' => true]);
     }
 
-    public function referenceReservationProposal(Request $request, EventInquiry $reservation, EventDateHoldService $holds, EventQuoteCalculator $calculator): JsonResponse
+    public function referenceReservationProposal(Request $request, EventInquiry $reservation): JsonResponse
     {
-        if (in_array(config('mail.default'), ['log', 'array'], true)) {
-            return response()->json(['message' => 'Proposal not sent. Configure SMTP first; the current mailer does not deliver email.'], 503);
-        }
-        $validated = $request->validate(['message' => ['nullable', 'string', 'max:3000']]);
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:12000'],
+        ]);
+
         abort_if($reservation->package === null, 422, 'Select a package on the customer inquiry before sending a proposal.');
-        $quote = $calculator->calculate($reservation);
-        abort_unless($quote['available'], 422, 'The selected package has no price.');
-        $payment = EventPaymentSettings::all();
-        abort_if(blank($payment['bank_name']) && blank($payment['qr_image_path']), 422, 'Configure bank details or a QR code in Event deposits & payment details first.');
-        $token = Str::random(64);
-        $version = (int) $reservation->proposals()->max('version') + 1;
-        $expiresAt = now()->addHours(max(1, min(720, (int) $payment['hold_duration_hours'])));
-        $snapshot = [
-            'quote' => $quote,
-            'customer' => ['name' => trim($reservation->first_name.' '.$reservation->last_name), 'email' => $reservation->email],
-            'event' => ['reference' => $reservation->reference, 'type' => $reservation->event_type, 'date' => $reservation->event_date->toDateString(), 'time' => $reservation->preferred_time, 'guests' => $reservation->guest_count],
-            'package' => ['name' => $reservation->package->name, 'description' => $reservation->package->description],
-            'payment' => $payment,
-        ];
-        $proposal = DB::transaction(function () use ($reservation, $token, $version, $expiresAt, $snapshot, $validated, $holds): EventProposal {
-            $reservation->proposals()->whereNull('superseded_at')->update(['superseded_at' => now()]);
-            $proposal = $reservation->proposals()->create([
-                'version' => $version, 'snapshot' => $snapshot, 'personal_note' => $validated['message'] ?? null,
-                'token_hash' => hash('sha256', $token), 'token_encrypted' => $token, 'expires_at' => $expiresAt,
-            ]);
-            $holds->acquire($reservation, $proposal, $expiresAt);
-            return $proposal;
+        abort_if(EventBlackoutDate::query()->whereDate('date', $reservation->event_date)->exists(), 409, 'This event date is blocked.');
+        $overlap = EventInquiry::query()->where('id', '!=', $reservation->id)
+            ->whereDate('event_date', $reservation->event_date)
+            ->whereIn('status', EventInquiry::BLOCKING_STATUSES)
+            ->exists();
+        abort_if($overlap, 409, 'Another active inquiry is already holding this date.');
+
+        $depositLink = URL::temporarySignedRoute('events.deposit', now()->addDays(7), ['inquiry' => $reservation->id]);
+        Mail::send('emails.event-proposal', [
+            'messageText' => $validated['message'],
+            'depositLink' => $depositLink,
+        ], function ($mail) use ($reservation): void {
+            $mail->to($reservation->email, trim($reservation->first_name.' '.$reservation->last_name))
+                ->subject('Your Passenger Seat event proposal · '.$reservation->reference);
         });
-        $log = EventEmailLog::create(['event_inquiry_id' => $reservation->id, 'event_proposal_id' => $proposal->id, 'type' => 'proposal', 'recipient' => $reservation->email, 'status' => 'sending', 'queued_at' => now()]);
-        try {
-            Mail::send('emails.event-proposal', ['proposal' => $proposal, 'snapshot' => $snapshot, 'proposalUrl' => route('events.proposal', ['token' => $token])], function ($mail) use ($reservation): void {
-                $mail->to($reservation->email, trim($reservation->first_name.' '.$reservation->last_name))
-                    ->subject('Your Passenger Seat event proposal · '.$reservation->reference);
-            });
-            $proposal->update(['sent_at' => now()]);
-            $reservation->update(['status' => 'proposal_sent_on_hold']);
-            $log->update(['status' => 'sent', 'sent_at' => now()]);
-        } catch (Throwable $exception) {
-            $log->update(['status' => 'failed', 'error' => Str::limit($exception->getMessage(), 4000)]);
-            report($exception);
-            return response()->json(['message' => 'Proposal email delivery failed. Check SMTP settings and retry.'], 502);
-        }
-        return response()->json(['ok' => true, 'status' => 'Proposal sent · date held', 'expires_at' => $expiresAt->toIso8601String()]);
+
+        $reservation->update(['status' => 'under_review']);
+
+        return response()->json(['ok' => true, 'status' => 'Under review']);
     }
+
     public function referenceFaq(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -704,13 +679,6 @@ class ModuleController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'under_review', 'approved', 'declined'])],
         ]);
-
-        if ($validated['status'] === 'approved') {
-            return back()->withErrors(['status' => 'Verify the customer deposit before confirming this booking.']);
-        }
-        if ($validated['status'] === 'declined') {
-            app(EventDateHoldService::class)->release($reservation, 'Inquiry declined by staff');
-        }
 
         $reservation->update($validated);
 

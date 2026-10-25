@@ -26,7 +26,6 @@ use App\Models\ActivityLog;
 use App\Models\AdminAlertRule;
 use App\Services\AdminAlertService;
 use App\Services\TableSessionStatusService;
-use App\Services\EventQuoteCalculator;
 use App\Support\AdminSettings;
 use App\Support\TableQrUrl;
 use App\Support\MenuImageUrl;
@@ -43,7 +42,6 @@ class DashboardController extends Controller
         Request $request,
         AdminAlertService $alertService,
         TableSessionStatusService $tableSessionStatuses,
-        EventQuoteCalculator $eventQuotes,
     ): JsonResponse
     {
         $databaseSettings = SystemSetting::query()
@@ -151,13 +149,13 @@ class DashboardController extends Controller
                         'approved', 'confirmed', 'booked' => 'Approved',
                         'declined' => 'Declined',
                         'under_review' => 'Under review',
-                        'proposal_sent_on_hold' => 'Proposal sent · date held',
-                        'proposal_accepted' => 'Proposal accepted · deposit due',
-                        'deposit_submitted' => 'Deposit submitted · review needed',
                         default => 'New',
                     },
                     'pk' => $inquiry->package?->name ?? '',
-                    'quote' => $eventQuotes->calculate($inquiry),
+                    'quote' => $this->eventQuote($inquiry, $settings),
+                    'depositLink' => \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                        'events.deposit', now()->addDays(7), ['inquiry' => $inquiry->id],
+                    ),
                     'preferredPackage' => $inquiry->preferred_package ?? '',
                     'packageId' => $inquiry->event_package_id,
                     'em' => $inquiry->email,

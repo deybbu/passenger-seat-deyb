@@ -14,7 +14,6 @@ use App\Http\Controllers\CustomerQrOrderController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\EventInquiryController;
-use App\Http\Controllers\EventProposalController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\POSController;
@@ -66,9 +65,6 @@ Route::view('/story', 'landing.story')->name('story');
 Route::redirect('/our-story', '/story');
 Route::get('/events', [EventInquiryController::class, 'index'])->name('events');
 Route::post('/events', [EventInquiryController::class, 'store'])->name('events.store');
-Route::get('/event-proposal/{token}', [EventProposalController::class, 'show'])->middleware('throttle:30,1')->name('events.proposal');
-Route::post('/event-proposal/{token}/accept', [EventProposalController::class, 'accept'])->middleware('throttle:10,1')->name('events.proposal.accept');
-Route::post('/event-proposal/{token}/deposit', [EventProposalController::class, 'submitDeposit'])->middleware('throttle:5,1')->name('events.proposal.deposit');
 Route::get('/events/{inquiry}/deposit', [EventInquiryController::class, 'deposit'])
     ->middleware('signed')->name('events.deposit');
 Route::view('/contact', 'landing.contact')->name('contact');
@@ -240,10 +236,6 @@ Route::middleware(['auth', 'role:admin'])
         Route::delete('/api/reference/table-qr/{restaurantTable}', [TableQrController::class, 'referenceDelete'])->name('api.reference.table-qr.delete');
         Route::patch('/api/reference/reservations/{reservation}', [ModuleController::class, 'referenceReservation'])->name('api.reference.reservations.update');
         Route::post('/api/reference/reservations/{reservation}/proposal', [ModuleController::class, 'referenceReservationProposal'])->name('api.reference.reservations.proposal');
-        Route::get('/event-payment-settings', [EventProposalController::class, 'settings'])->name('event-payment-settings');
-        Route::post('/event-payment-settings', [EventProposalController::class, 'saveSettings'])->name('event-payment-settings.save');
-        Route::get('/event-deposits/{deposit}/proof', [EventProposalController::class, 'proof'])->name('event-deposits.proof');
-        Route::post('/event-deposits/{deposit}/review', [EventProposalController::class, 'review'])->name('event-deposits.review');
         Route::post('/api/reference/reservations/blackout', [ModuleController::class, 'toggleBlackout'])->name('api.reference.reservations.blackout');
         Route::post('/api/reference/chatbot/faq', [ModuleController::class, 'referenceFaq'])->name('api.reference.chatbot.faq');
         Route::post('/api/reference/chatbot/unanswered/{question}', [ModuleController::class, 'referenceAnswer'])->name('api.reference.chatbot.answer');
