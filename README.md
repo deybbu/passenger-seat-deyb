@@ -1,4 +1,6 @@
-# Passenger Seat Restaurant — Laravel 12
+# passenger-seat-deyb
+
+## Passenger Seat Restaurant — Laravel 12
 
 This repository contains the Passenger Seat restaurant application, built on Laravel 12.
 It includes migrations, models, role middleware, routes, controllers, seed data, and Blade views for the core workflows.
