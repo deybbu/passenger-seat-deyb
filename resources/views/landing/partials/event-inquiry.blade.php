@@ -82,6 +82,7 @@
             @else
                 <form class="landing-solari-event-card" id="event-inquiry-form" action="{{ route('events.store') }}" method="POST" novalidate>
                     @csrf
+                    @if ($errors->has('inquiry'))<p class="event-error" role="alert">{{ $errors->first('inquiry') }}</p>@endif
                     <h3 class="h3">2. Contact Information</h3>
                     <div class="two">
                         <label for="first-name">First name *<input id="first-name" name="first_name" autocomplete="given-name" value="{{ old('first_name') }}" maxlength="100" required data-ticket-input="first_name" @if ($errors->has('first_name')) aria-invalid="true" @endif>

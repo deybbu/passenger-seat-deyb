@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="feat">
                     ${photoMarkup(featured, 'fi')}
                     <div class="fn">${escapeHtml(featured.name)}</div>
-                    <p class="fd">${escapeHtml(featured.description || '')}</p>
+                    ${featured.description ? `<div class="description"><small>Description</small><p class="fd">${escapeHtml(featured.description)}</p></div>` : ''}
                     <div class="fpr">${money.format(featured.price)}</div>
                     <div class="ing"><small>Ingredients</small><div class="ic">${ingredients}</div></div>
                     ${action}

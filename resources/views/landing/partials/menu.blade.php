@@ -49,7 +49,9 @@
                         <span class="cat">{{ $itemCategory }}</span>
                         <div class="mc">
                             <h3>{{ $item->name }}</h3>
-                            <p>{{ $item->description }}</p>
+                            @if ($item->description)
+                                <p class="menu-item-description"><strong>Description:</strong> {{ $item->description }}</p>
+                            @endif
                             <div class="pr">
                                 <span>₱{{ number_format((float) $item->price, 2) }} · {{ $itemAvailability }}</span>
                                 @if ($itemOrderable)

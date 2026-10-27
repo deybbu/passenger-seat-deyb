@@ -36,6 +36,10 @@
             <form class="landing-event-form" action="{{ route('events.store') }}" method="POST" novalidate>
                 @csrf
 
+                @if ($errors->has('inquiry'))
+                    <p class="landing-event-error" role="alert">{{ $errors->first('inquiry') }}</p>
+                @endif
+
                 <section class="landing-event-card">
                     <h2>1. Event Availability Calendar</h2>
                     <div class="landing-event-legend" aria-label="Calendar legend">

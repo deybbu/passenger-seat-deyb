@@ -342,7 +342,7 @@ function renderInfo() {
   $("#info").innerHTML = `<h2>${it[0]}</h2>
     ${it[1] && it[1].length <= 40 ? `<div class="sub">${it[1]}</div>` : ""}
     ${servingSize ? `<span class="serve">${servingSize}</span>` : ""}
-    ${description ? `<p class="desc">${escapeHtml(description)}</p><details class="desc-toggle"><summary>View full description</summary><p class="full-desc">${escapeHtml(description)}</p></details>` : ""}
+    ${description ? `<p class="desc"><b>Description:</b> ${escapeHtml(description)}</p><details class="desc-toggle"><summary>View full description</summary><p class="full-desc">${escapeHtml(description)}</p></details>` : ""}
     ${ingredients.length ? `<div class="ing" tabindex="0" aria-label="Menu ingredients. Scroll horizontally to see all ingredients"><b>Ingredients</b><span class="ing-hint">Swipe or scroll →</span>${ingredients.map(x => `<span>${x}</span>`).join("")}</div>` : ""}
     ${multi ? `<div class="chips">${o.map((x, j) => `<button class="chip ${j === opt ? "on" : ""}" data-o="${j}">${servingLabel(x[0])}</button>`).join("")}</div>` : ""}
     ${modifiers.map(group => `<label class="modifier-choice">${group.name}${group.required ? " *" : ""}<select data-modifier-group="${group.id}" aria-label="${group.name}" ${soldOut ? "disabled" : ""}>${group.required ? "" : '<option value="">No selection</option>'}${group.options.map(option => `<option value="${option.id}" ${Number(selectedModifiers[group.id]) === option.id ? "selected" : ""}>${option.name}${option.price_delta ? ` (${option.price_delta > 0 ? "+" : "−"}${peso(Math.abs(option.price_delta))})` : ""}</option>`).join("")}</select></label>`).join("")}

@@ -23,6 +23,19 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (HttpException $exception, Request $request) {
+            if ($exception->getStatusCode() === 419 && $request->isMethod('POST') && $request->is('events')) {
+                $message = 'Your inquiry form expired before it was submitted. Please review your details and submit it again.';
+
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => $message], 419);
+                }
+
+                return redirect()
+                    ->back()
+                    ->withInput($request->except('_token'))
+                    ->withErrors(['inquiry' => $message]);
+            }
+
             if ($exception->getStatusCode() === 419 && $request->isMethod('POST')) {
                 if ($request->is('staff/logout') || $request->is('staff/inventory/logout')) {
                     Auth::logout();

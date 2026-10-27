@@ -27,7 +27,7 @@
         </div>
 
         @if ($item->description)
-            <p class="landing-menu-description">{{ $item->description }}</p>
+            <p class="landing-menu-description"><strong>Description:</strong> {{ $item->description }}</p>
         @endif
 
         <div class="landing-menu-card-meta">

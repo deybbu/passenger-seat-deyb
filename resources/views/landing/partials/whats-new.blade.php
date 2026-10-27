@@ -18,7 +18,9 @@
                         <img class="nc-photo" src="{{ $itemPhoto }}" alt="{{ $item->name }}" loading="lazy" decoding="async">
                     @endif
                     <h3>{{ $item->name }}</h3>
-                    <p>{{ $item->description }}</p>
+                    @if ($item->description)
+                        <p><strong>Description:</strong> {{ $item->description }}</p>
+                    @endif
                     <a class="go" href="{{ route('menu') }}">See the Menu</a>
                 </article>
             @endforeach
